@@ -6,6 +6,7 @@
 <title>SION Finanzas</title>
 
 <style>
+
 body{
     font-family: Arial, Helvetica, sans-serif;
     background:#f5f6fa;
@@ -55,7 +56,9 @@ footer{
     text-align:center;
     color:#888;
 }
+
 </style>
+
 </head>
 
 <body>
@@ -76,7 +79,7 @@ footer{
 <p>Cargar pagos desde Excel del sistema.</p>
 </div>
 
-<div class="card" onclick="ir('movimientos')">
+<div class="card" onclick="ir('banco')">
 <h3>Movimientos Bancarios</h3>
 <p>Registrar movimientos del banco.</p>
 </div>
@@ -113,7 +116,12 @@ SION ERP • Sistema financiero
 
 function ir(modulo){
 
-alert("Módulo: " + modulo + " (en construcción)");
+if(modulo === "pagos"){
+window.location.href = "pagos.html";
+return;
+}
+
+alert("Módulo en construcción");
 
 }
 
