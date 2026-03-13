@@ -2,18 +2,59 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Pagos del Programa</title>
 
+<script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+
 <style>
+
 body{
-    font-family: Arial;
-    margin:40px;
-    background:#f4f6f8;
+font-family: Arial;
+margin:40px;
+background:#f4f6f8;
 }
 
 h1{
-    color:#1f2937;
+color:#1f2937;
 }
+
+button{
+background:#1f2937;
+color:white;
+border:none;
+padding:10px 20px;
+cursor:pointer;
+border-radius:5px;
+}
+
+input{
+margin-top:20px;
+}
+
+table{
+margin-top:30px;
+border-collapse: collapse;
+width:100%;
+background:white;
+}
+
+th, td{
+border:1px solid #ddd;
+padding:8px;
+font-size:14px;
+}
+
+th{
+background:#1f2937;
+color:white;
+}
+
+.volver{
+margin-top:20px;
+display:inline-block;
+}
+
 </style>
 
 </head>
@@ -22,9 +63,87 @@ h1{
 
 <h1>Pagos del Programa</h1>
 
-<p>Aquí se cargará el Excel con los pagos del sistema.</p>
+<p>Cargar archivo Excel del sistema</p>
 
-<a href="index.html">← Volver al panel principal</a>
+<input type="file" id="excelFile">
+
+<table id="tablaPagos">
+
+<thead>
+
+<tr>
+<th>Recibo</th>
+<th>Afiliado</th>
+<th>Documento</th>
+<th>Asesor</th>
+<th>Valor</th>
+<th>Concepto</th>
+</tr>
+
+</thead>
+
+<tbody>
+
+</tbody>
+
+</table>
+
+<a class="volver" href="index.html">← Volver al panel principal</a>
+
+<script>
+
+document.getElementById('excelFile').addEventListener('change', leerExcel);
+
+function leerExcel(e){
+
+const archivo = e.target.files[0];
+
+const reader = new FileReader();
+
+reader.onload = function(event){
+
+const data = new Uint8Array(event.target.result);
+
+const workbook = XLSX.read(data, {type:'array'});
+
+const sheet = workbook.Sheets[workbook.SheetNames[0]];
+
+const rows = XLSX.utils.sheet_to_json(sheet);
+
+mostrarDatos(rows);
+
+};
+
+reader.readAsArrayBuffer(archivo);
+
+}
+
+function mostrarDatos(rows){
+
+const tbody = document.querySelector("#tablaPagos tbody");
+
+tbody.innerHTML = "";
+
+rows.forEach(row => {
+
+let tr = document.createElement("tr");
+
+tr.innerHTML = `
+<td>${row["Recibo"] ?? ""}</td>
+<td>${row["Afiliado"] ?? ""}</td>
+<td>${row["Documento"] ?? ""}</td>
+<td>${row["Asesor"] ?? ""}</td>
+<td>${row["Total"] ?? ""}</td>
+<td>Seguridad Social</td>
+`;
+
+tbody.appendChild(tr);
+
+});
+
+}
+
+</script>
 
 </body>
 </html>
