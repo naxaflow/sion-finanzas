@@ -1,8 +1,10 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
+
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
 <title>Pagos del Programa</title>
 
 <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
@@ -19,15 +21,6 @@ h1{
 color:#1f2937;
 }
 
-button{
-background:#1f2937;
-color:white;
-border:none;
-padding:10px 20px;
-cursor:pointer;
-border-radius:5px;
-}
-
 input{
 margin-top:20px;
 }
@@ -39,7 +32,7 @@ width:100%;
 background:white;
 }
 
-th, td{
+th,td{
 border:1px solid #ddd;
 padding:8px;
 font-size:14px;
@@ -50,9 +43,10 @@ background:#1f2937;
 color:white;
 }
 
-.volver{
+.error{
+color:red;
 margin-top:20px;
-display:inline-block;
+font-weight:bold;
 }
 
 </style>
@@ -63,83 +57,131 @@ display:inline-block;
 
 <h1>Pagos del Programa</h1>
 
-<p>Cargar archivo Excel del sistema</p>
+<p>Subir archivo oficial generado por el sistema</p>
 
 <input type="file" id="excelFile">
 
-<table id="tablaPagos">
+<div id="errores" class="error"></div>
+
+<table id="tabla">
 
 <thead>
 
 <tr>
 <th>Recibo</th>
-<th>Afiliado</th>
 <th>Documento</th>
-<th>Asesor</th>
-<th>Valor</th>
-<th>Concepto</th>
+<th>Afiliado</th>
+<th>Banco</th>
+<th>Detalle</th>
+<th>Total</th>
+<th>Estado</th>
 </tr>
 
 </thead>
 
-<tbody>
-
-</tbody>
+<tbody></tbody>
 
 </table>
 
-<a class="volver" href="index.html">← Volver al panel principal</a>
+<br>
+<a href="index.html">← Volver al panel</a>
 
 <script>
 
-document.getElementById('excelFile').addEventListener('change', leerExcel);
+document.getElementById("excelFile").addEventListener("change",procesarExcel)
 
-function leerExcel(e){
+function procesarExcel(e){
 
-const archivo = e.target.files[0];
+const archivo = e.target.files[0]
 
-const reader = new FileReader();
+if(archivo.name !== "Pagos_Seguridad_Social.xlsx"){
+
+document.getElementById("errores").innerText =
+"Archivo incorrecto. Debe subir el archivo oficial Pagos_Seguridad_Social.xlsx"
+
+return
+}
+
+const reader = new FileReader()
 
 reader.onload = function(event){
 
-const data = new Uint8Array(event.target.result);
+const data = new Uint8Array(event.target.result)
 
-const workbook = XLSX.read(data, {type:'array'});
+const workbook = XLSX.read(data,{type:"array"})
 
-const sheet = workbook.Sheets[workbook.SheetNames[0]];
+const sheet = workbook.Sheets[workbook.SheetNames[0]]
 
-const rows = XLSX.utils.sheet_to_json(sheet);
+const rows = XLSX.utils.sheet_to_json(sheet,{header:1})
 
-mostrarDatos(rows);
-
-};
-
-reader.readAsArrayBuffer(archivo);
+leerDatos(rows)
 
 }
 
-function mostrarDatos(rows){
+reader.readAsArrayBuffer(archivo)
 
-const tbody = document.querySelector("#tablaPagos tbody");
+}
 
-tbody.innerHTML = "";
+function leerDatos(rows){
 
-rows.forEach(row => {
+const tbody = document.querySelector("#tabla tbody")
 
-let tr = document.createElement("tr");
+tbody.innerHTML = ""
+
+let errores = []
+
+for(let i=1;i<rows.length;i++){
+
+let r = rows[i]
+
+let recibo = r[4]
+let documento = r[5]
+let afiliado = r[6]
+let detalle = r[10]
+let banco = r[12]
+
+let eps = Number(r[18]) || 0
+let arl = Number(r[20]) || 0
+let afp = Number(r[22]) || 0
+let ccf = Number(r[24]) || 0
+
+let totalSS = Number(r[29]) || 0
+let total = Number(r[28]) || 0
+
+let calculo = eps + arl + afp + ccf
+
+let estado = "OK"
+
+if(calculo !== totalSS){
+
+estado = "ERROR SS"
+
+errores.push("Error en recibo "+recibo)
+
+}
+
+let tr = document.createElement("tr")
 
 tr.innerHTML = `
-<td>${row["Recibo"] ?? ""}</td>
-<td>${row["Afiliado"] ?? ""}</td>
-<td>${row["Documento"] ?? ""}</td>
-<td>${row["Asesor"] ?? ""}</td>
-<td>${row["Total"] ?? ""}</td>
-<td>Seguridad Social</td>
-`;
+<td>${recibo}</td>
+<td>${documento}</td>
+<td>${afiliado}</td>
+<td>${banco}</td>
+<td>${detalle}</td>
+<td>${total}</td>
+<td>${estado}</td>
+`
 
-tbody.appendChild(tr);
+tbody.appendChild(tr)
 
-});
+}
+
+if(errores.length>0){
+
+document.getElementById("errores").innerText =
+errores.join("\n")
+
+}
 
 }
 
