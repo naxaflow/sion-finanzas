@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SION Finanzas</title>
+
+<style>
+body{
+    font-family: Arial, Helvetica, sans-serif;
+    background:#f5f6fa;
+    margin:0;
+}
+
+header{
+    background:#1f2937;
+    color:white;
+    padding:20px;
+}
+
+header h1{
+    margin:0;
+}
+
+.container{
+    padding:30px;
+}
+
+.cards{
+    display:grid;
+    grid-template-columns: repeat(auto-fit,minmax(220px,1fr));
+    gap:20px;
+}
+
+.card{
+    background:white;
+    padding:25px;
+    border-radius:10px;
+    box-shadow:0 4px 8px rgba(0,0,0,0.08);
+    cursor:pointer;
+    transition:0.2s;
+}
+
+.card:hover{
+    transform:translateY(-4px);
+}
+
+.card h3{
+    margin-top:0;
+}
+
+footer{
+    margin-top:40px;
+    padding:15px;
+    text-align:center;
+    color:#888;
+}
+</style>
+</head>
+
+<body>
+
+<header>
+<h1>SION Finanzas</h1>
+<p>Sistema de conciliación y control financiero</p>
+</header>
+
+<div class="container">
+
+<h2>Panel Principal</h2>
+
+<div class="cards">
+
+<div class="card" onclick="ir('pagos')">
+<h3>Pagos del Programa</h3>
+<p>Cargar pagos desde Excel del sistema.</p>
+</div>
+
+<div class="card" onclick="ir('movimientos')">
+<h3>Movimientos Bancarios</h3>
+<p>Registrar movimientos del banco.</p>
+</div>
+
+<div class="card" onclick="ir('conciliacion')">
+<h3>Conciliación</h3>
+<p>Cruzar pagos del programa con banco.</p>
+</div>
+
+<div class="card" onclick="ir('contabilidad')">
+<h3>Movimientos Contables</h3>
+<p>Registrar asientos contables manuales.</p>
+</div>
+
+<div class="card" onclick="ir('comisiones')">
+<h3>Comisiones</h3>
+<p>Calcular comisiones por afiliación, reintegro y recaudo.</p>
+</div>
+
+<div class="card" onclick="ir('reportes')">
+<h3>Reportes</h3>
+<p>Análisis financiero y flujo de dinero.</p>
+</div>
+
+</div>
+
+</div>
+
+<footer>
+SION ERP • Sistema financiero
+</footer>
+
+<script>
+
+function ir(modulo){
+
+alert("Módulo: " + modulo + " (en construcción)");
+
+}
+
+</script>
+
+</body>
+</html>
