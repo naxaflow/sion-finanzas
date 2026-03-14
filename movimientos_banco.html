@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Movimientos Bancarios – SION Finanzas</title>
 <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
   :root {
     --bg: #f0f2f5;
@@ -20,196 +21,118 @@
     --credit: #1e8a5e;
     --debit: #dc2626;
   }
-
   * { box-sizing: border-box; margin: 0; padding: 0; }
-
-  body {
-    font-family: 'Segoe UI', Arial, sans-serif;
-    background: var(--bg);
-    color: var(--text);
-    min-height: 100vh;
-  }
+  body { font-family: 'Segoe UI', Arial, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
 
   header {
-    background: var(--header-bg);
-    color: white;
-    padding: 20px 30px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    flex-wrap: wrap;
-    gap: 10px;
+    background: var(--header-bg); color: white; padding: 20px 30px;
+    display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;
   }
   header h1 { font-size: 1.4rem; font-weight: 700; }
   header p { font-size: 0.85rem; opacity: 0.7; margin-top: 2px; }
-  header a {
-    color: #93c5fd;
-    text-decoration: none;
-    font-size: 0.85rem;
-  }
+  header a { color: #93c5fd; text-decoration: none; font-size: 0.85rem; }
   header a:hover { text-decoration: underline; }
 
-  .container { padding: 30px; max-width: 1200px; margin: 0 auto; }
+  .container { padding: 30px; max-width: 1400px; margin: 0 auto; }
 
-  /* Upload zone */
+  .top-bar { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; margin-bottom: 24px; }
+  .top-bar select {
+    border: 1px solid var(--border); border-radius: 8px; padding: 9px 14px;
+    font-size: 0.9rem; color: var(--text); background: white; outline: none; cursor: pointer;
+  }
+
+  .btn {
+    padding: 9px 18px; border-radius: 8px; font-size: 0.88rem;
+    cursor: pointer; border: none; font-weight: 600; transition: opacity 0.2s;
+  }
+  .btn:hover { opacity: 0.85; }
+  .btn-primary { background: var(--accent); color: white; }
+  .btn-secondary { background: white; color: var(--text); border: 1px solid var(--border); }
+  .btn-excel { background: #166534; color: white; }
+
   .upload-zone {
-    background: var(--surface);
-    border: 2px dashed var(--border);
-    border-radius: 12px;
-    padding: 40px;
-    text-align: center;
-    cursor: pointer;
-    transition: border-color 0.2s, background 0.2s;
-    margin-bottom: 28px;
+    background: var(--surface); border: 2px dashed var(--border); border-radius: 12px;
+    padding: 32px; text-align: center; cursor: pointer; transition: 0.2s; margin-bottom: 24px;
   }
-  .upload-zone:hover, .upload-zone.drag-over {
-    border-color: var(--accent);
-    background: var(--accent-light);
-  }
-  .upload-zone .icon { font-size: 2.5rem; margin-bottom: 10px; }
-  .upload-zone h3 { font-size: 1rem; color: var(--text); margin-bottom: 6px; }
-  .upload-zone p { font-size: 0.82rem; color: var(--muted); }
-  .upload-zone input[type="file"] { display: none; }
+  .upload-zone:hover { border-color: var(--accent); background: var(--accent-light); }
+  .upload-zone .icon { font-size: 2rem; margin-bottom: 8px; }
+  .upload-zone h3 { font-size: 0.95rem; margin-bottom: 4px; }
+  .upload-zone p { font-size: 0.8rem; color: var(--muted); }
 
-  .btn-upload {
-    display: inline-block;
-    margin-top: 14px;
-    background: var(--accent);
-    color: white;
-    padding: 9px 22px;
-    border-radius: 6px;
-    font-size: 0.9rem;
-    cursor: pointer;
-    border: none;
-    transition: opacity 0.2s;
-  }
-  .btn-upload:hover { opacity: 0.85; }
-
-  /* Resumen cards */
   .resumen {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-    gap: 16px;
-    margin-bottom: 28px;
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+    gap: 16px; margin-bottom: 24px;
   }
-  .stat-card {
-    background: var(--surface);
-    border-radius: 10px;
-    padding: 20px;
-    box-shadow: 0 2px 6px rgba(0,0,0,0.06);
-  }
-  .stat-card .label { font-size: 0.75rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px; }
-  .stat-card .value { font-size: 1.4rem; font-weight: 700; }
+  .stat-card { background: var(--surface); border-radius: 10px; padding: 18px; box-shadow: 0 2px 6px rgba(0,0,0,0.06); }
+  .stat-card .label { font-size: 0.72rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px; }
+  .stat-card .value { font-size: 1.3rem; font-weight: 700; }
   .stat-card.credit .value { color: var(--credit); }
-  .stat-card.debit .value { color: var(--debit); }
-  .stat-card.total .value { color: var(--text); }
-  .stat-card.count .value { color: #2563eb; }
+  .stat-card.debit .value  { color: var(--debit); }
+  .stat-card.count .value  { color: #2563eb; }
 
-  /* Filtros */
   .filtros {
-    background: var(--surface);
-    border-radius: 10px;
-    padding: 16px 20px;
-    margin-bottom: 20px;
-    display: flex;
-    gap: 12px;
-    flex-wrap: wrap;
-    align-items: center;
+    background: var(--surface); border-radius: 10px; padding: 14px 18px;
+    margin-bottom: 18px; display: flex; gap: 12px; flex-wrap: wrap; align-items: center;
     box-shadow: 0 2px 6px rgba(0,0,0,0.05);
   }
   .filtros select, .filtros input[type="text"] {
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    padding: 7px 12px;
-    font-size: 0.85rem;
-    color: var(--text);
-    background: white;
-    outline: none;
+    border: 1px solid var(--border); border-radius: 6px; padding: 7px 12px;
+    font-size: 0.85rem; color: var(--text); background: white; outline: none;
   }
-  .filtros select:focus, .filtros input:focus { border-color: var(--accent); }
   .filtros label { font-size: 0.82rem; color: var(--muted); }
 
-  /* Tabla */
-  .tabla-wrap {
-    background: var(--surface);
-    border-radius: 12px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.07);
-    overflow: hidden;
-  }
+  .tabla-wrap { background: var(--surface); border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.07); overflow: hidden; }
   .tabla-header {
-    padding: 16px 20px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    border-bottom: 1px solid var(--border);
+    padding: 14px 18px; display: flex; justify-content: space-between; align-items: center;
+    border-bottom: 1px solid var(--border); flex-wrap: wrap; gap: 8px;
   }
   .tabla-header h3 { font-size: 0.95rem; font-weight: 600; }
   .tabla-header span { font-size: 0.8rem; color: var(--muted); }
-
   .table-scroll { overflow-x: auto; }
 
-  table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 0.85rem;
-  }
+  table { width: 100%; border-collapse: collapse; font-size: 0.83rem; }
   thead th {
-    background: #f8fafc;
-    padding: 11px 14px;
-    text-align: left;
-    font-size: 0.75rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    color: var(--muted);
-    border-bottom: 1px solid var(--border);
-    white-space: nowrap;
+    background: #f8fafc; padding: 10px 12px; text-align: left;
+    font-size: 0.72rem; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.04em; color: var(--muted); border-bottom: 1px solid var(--border); white-space: nowrap;
   }
   tbody tr { border-bottom: 1px solid #f1f3f5; transition: background 0.1s; }
   tbody tr:hover { background: #f8fafb; }
-  tbody td { padding: 10px 14px; vertical-align: middle; }
+  tbody td { padding: 8px 12px; vertical-align: middle; }
 
   .monto-credito { color: var(--credit); font-weight: 600; }
   .monto-debito  { color: var(--debit);  font-weight: 600; }
 
-  .badge {
-    display: inline-block;
-    padding: 2px 9px;
-    border-radius: 20px;
-    font-size: 0.72rem;
-    font-weight: 600;
-  }
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 0.7rem; font-weight: 600; }
   .badge-credito { background: var(--accent-light); color: var(--credit); }
   .badge-debito  { background: var(--danger-light);  color: var(--debit); }
 
-  .estado-ok    { background: #ecfdf5; color: #065f46; padding: 2px 8px; border-radius: 20px; font-size: 0.72rem; font-weight: 600; }
-
-  /* Vacío / error */
-  .empty-state {
-    text-align: center;
-    padding: 60px 20px;
-    color: var(--muted);
+  .input-tabla {
+    border: 1px solid transparent; border-radius: 5px; padding: 4px 7px;
+    font-size: 0.82rem; width: 100%; background: transparent; color: var(--text); transition: border-color 0.15s;
   }
-  .empty-state .icon { font-size: 3rem; margin-bottom: 12px; }
-  .empty-state p { font-size: 0.9rem; }
+  .input-tabla:hover { border-color: var(--border); }
+  .input-tabla:focus { border-color: var(--accent); outline: none; background: white; }
+  select.input-tabla { cursor: pointer; }
 
-  .alerta-error {
-    background: var(--danger-light);
-    color: var(--danger);
-    border: 1px solid #fca5a5;
-    border-radius: 8px;
-    padding: 12px 16px;
-    margin-bottom: 20px;
-    font-size: 0.87rem;
-    display: none;
+  .btn-del {
+    background: none; border: none; color: #d1d5db; cursor: pointer;
+    font-size: 1rem; padding: 2px 6px; border-radius: 4px; transition: color 0.15s;
   }
+  .btn-del:hover { color: var(--danger); }
 
-  footer {
-    text-align: center;
-    padding: 24px;
-    color: var(--muted);
-    font-size: 0.8rem;
+  .empty-state { text-align: center; padding: 50px 20px; color: var(--muted); }
+  .empty-state .icon { font-size: 2.5rem; margin-bottom: 10px; }
+
+  .toast {
+    position: fixed; bottom: 24px; right: 24px; background: #1f2937; color: white;
+    padding: 12px 20px; border-radius: 8px; font-size: 0.85rem; z-index: 9999;
+    opacity: 0; transform: translateY(10px); transition: 0.3s; pointer-events: none;
   }
+  .toast.show { opacity: 1; transform: translateY(0); }
+  .toast.error { background: var(--danger); }
+
+  footer { text-align: center; padding: 24px; color: var(--muted); font-size: 0.8rem; }
 </style>
 </head>
 <body>
@@ -223,23 +146,29 @@
 </header>
 
 <div class="container">
-  <h2 style="margin-bottom:20px; font-size:1.2rem;">Movimientos Bancarios — Bancolombia</h2>
+  <h2 style="margin-bottom:20px;font-size:1.15rem;">Movimientos Bancarios</h2>
 
-  <!-- Upload -->
-  <div class="upload-zone" id="uploadZone">
-    <div class="icon">📂</div>
-    <h3>Arrastrá el extracto de Bancolombia aquí</h3>
-    <p>Formato .xlsx exportado desde la sucursal virtual</p>
-    <input type="file" id="excelFile" accept=".xlsx,.xls">
-    <button class="btn-upload" onclick="document.getElementById('excelFile').click()">Seleccionar archivo</button>
+  <div class="top-bar">
+    <select id="selectCuenta" onchange="cargarMovimientos()">
+      <option value="Banco SION">🏦 Banco SION</option>
+      <option value="Daviplata">📱 Daviplata</option>
+      <option value="Independientes">👤 Independientes</option>
+    </select>
+    <button class="btn btn-secondary" onclick="document.getElementById('excelFile').click()">📂 Cargar Excel</button>
+    <input type="file" id="excelFile" accept=".xlsx,.xls" style="display:none">
+    <button class="btn btn-primary" onclick="agregarManual()">+ Agregar movimiento</button>
+    <button class="btn btn-excel" onclick="exportarExcel()">⬇ Exportar Excel</button>
   </div>
 
-  <div class="alerta-error" id="alertaError"></div>
+  <div class="upload-zone" id="uploadHint" onclick="document.getElementById('excelFile').click()">
+    <div class="icon">📂</div>
+    <h3>Arrastrá el extracto bancario aquí o hacé clic para seleccionar</h3>
+    <p>Formato .xlsx exportado desde la sucursal virtual de Bancolombia</p>
+  </div>
 
-  <!-- Resumen (oculto hasta cargar) -->
-  <div class="resumen" id="resumen" style="display:none;">
+  <div class="resumen">
     <div class="stat-card count">
-      <div class="label">Total movimientos</div>
+      <div class="label">Movimientos</div>
       <div class="value" id="statTotal">0</div>
     </div>
     <div class="stat-card credit">
@@ -250,28 +179,39 @@
       <div class="label">Total egresos</div>
       <div class="value" id="statDebitos">$0</div>
     </div>
-    <div class="stat-card total">
+    <div class="stat-card">
       <div class="label">Saldo neto</div>
       <div class="value" id="statNeto">$0</div>
     </div>
   </div>
 
-  <!-- Filtros -->
-  <div class="filtros" id="filtros" style="display:none;">
+  <div class="filtros">
     <label>Tipo:</label>
-    <select id="filtroTipo" onchange="aplicarFiltros()">
+    <select id="filtroTipo" onchange="renderTabla()">
       <option value="">Todos</option>
       <option value="credito">Solo ingresos</option>
       <option value="debito">Solo egresos</option>
     </select>
+    <label>Concepto:</label>
+    <select id="filtroConcepto" onchange="renderTabla()">
+      <option value="">Todos</option>
+      <option>Seguridad Social</option>
+      <option>Gastos Bancarios</option>
+      <option>Hernan</option>
+      <option>Incapacidad</option>
+      <option>Inc-Pagada</option>
+      <option>Ingreso Intereses</option>
+      <option>Otros gastos</option>
+      <option>Otros ingresos</option>
+      <option>Planillas Pagadas</option>
+    </select>
     <label>Buscar:</label>
-    <input type="text" id="filtroBuscar" placeholder="Descripción, referencia..." oninput="aplicarFiltros()">
+    <input type="text" id="filtroBuscar" placeholder="Descripción, recibo..." oninput="renderTabla()">
   </div>
 
-  <!-- Tabla -->
   <div class="tabla-wrap">
     <div class="tabla-header">
-      <h3>Detalle de movimientos</h3>
+      <h3 id="tituloTabla">Banco SION</h3>
       <span id="contadorFiltrado"></span>
     </div>
     <div class="table-scroll">
@@ -285,17 +225,15 @@
             <th>Referencia</th>
             <th>Tipo</th>
             <th>Monto</th>
+            <th>Recibo</th>
+            <th>Concepto</th>
+            <th></th>
           </tr>
         </thead>
         <tbody id="tablaCuerpo">
-          <tr>
-            <td colspan="7">
-              <div class="empty-state">
-                <div class="icon">📊</div>
-                <p>Cargá un archivo Excel para ver los movimientos</p>
-              </div>
-            </td>
-          </tr>
+          <tr><td colspan="10">
+            <div class="empty-state"><div class="icon">⏳</div><p>Cargando movimientos...</p></div>
+          </td></tr>
         </tbody>
       </table>
     </div>
@@ -303,169 +241,266 @@
 </div>
 
 <footer>SION ERP • Sistema financiero</footer>
+<div class="toast" id="toast"></div>
 
 <script>
-  let todosLosMovimientos = [];
+  const { createClient } = supabase;
+  const sb = createClient(
+    'https://tatrfmssficxexleyvdd.supabase.co',
+    'sb_publishable_szrMuEOOopjJUTo0hgUfhQ_v_idMvXI'
+  );
 
-  // Drag & drop
-  const zone = document.getElementById('uploadZone');
-  zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag-over'); });
-  zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
-  zone.addEventListener('drop', e => {
-    e.preventDefault();
-    zone.classList.remove('drag-over');
-    const file = e.dataTransfer.files[0];
-    if (file) procesarArchivo(file);
-  });
+  const CONCEPTOS = [
+    '', 'Seguridad Social', 'Gastos Bancarios', 'Hernan',
+    'Incapacidad', 'Inc-Pagada', 'Ingreso Intereses',
+    'Otros gastos', 'Otros ingresos', 'Planillas Pagadas'
+  ];
+
+  let movimientos = [];
 
   document.getElementById('excelFile').addEventListener('change', e => {
-    if (e.target.files[0]) procesarArchivo(e.target.files[0]);
+    if (e.target.files[0]) procesarExcel(e.target.files[0]);
   });
 
-  function procesarArchivo(archivo) {
-    const ext = archivo.name.split('.').pop().toLowerCase();
-    if (!['xlsx', 'xls'].includes(ext)) {
-      mostrarError('El archivo debe ser .xlsx o .xls');
-      return;
-    }
+  const hint = document.getElementById('uploadHint');
+  hint.addEventListener('dragover', e => { e.preventDefault(); hint.style.borderColor = 'var(--accent)'; });
+  hint.addEventListener('dragleave', () => hint.style.borderColor = '');
+  hint.addEventListener('drop', e => {
+    e.preventDefault(); hint.style.borderColor = '';
+    if (e.dataTransfer.files[0]) procesarExcel(e.dataTransfer.files[0]);
+  });
+
+  cargarMovimientos();
+
+  async function cargarMovimientos() {
+    const cuenta = document.getElementById('selectCuenta').value;
+    document.getElementById('tituloTabla').textContent = cuenta;
+    document.getElementById('tablaCuerpo').innerHTML =
+      `<tr><td colspan="10"><div class="empty-state"><div class="icon">⏳</div><p>Cargando...</p></div></td></tr>`;
+
+    const { data, error } = await sb
+      .from('movimientos')
+      .select('*')
+      .eq('cuenta', cuenta)
+      .order('created_at', { ascending: false });
+
+    if (error) { mostrarToast('Error cargando datos: ' + error.message, true); return; }
+    movimientos = data || [];
+    actualizarResumen();
+    renderTabla();
+    if (movimientos.length > 0) hint.style.display = 'none';
+  }
+
+  async function procesarExcel(archivo) {
+    mostrarToast('⏳ Procesando archivo...');
     const reader = new FileReader();
-    reader.onload = function(e) {
+    reader.onload = async function(e) {
       try {
-        const data = new Uint8Array(e.target.result);
-        const wb = XLSX.read(data, { type: 'array', cellDates: true });
+        const wb = XLSX.read(new Uint8Array(e.target.result), { type: 'array', cellDates: true });
         const ws = wb.Sheets[wb.SheetNames[0]];
         const rows = XLSX.utils.sheet_to_json(ws, { header: 1, raw: false, dateNF: 'yyyy-mm-dd' });
-        parsearMovimientos(rows);
+        const cuenta = document.getElementById('selectCuenta').value;
+        const nuevos = [];
+
+        for (let i = 0; i < rows.length; i++) {
+          const r = rows[i];
+          if (!r || r.length < 3) continue;
+          const monto = parsearMonto(r[6]);
+          if (monto === 0 && !r[2]) continue;
+          const ref1 = r[3] && r[3] !== '- -' ? String(r[3]) : '';
+          const ref2 = r[4] && r[4] !== '- -' && String(r[4]) !== ref1 ? String(r[4]) : '';
+          nuevos.push({
+            fecha:       formatFecha(r[0]),
+            canal:       String(r[1] || ''),
+            descripcion: String(r[2] || ''),
+            referencia:  [ref1, ref2].filter(Boolean).join(' / '),
+            monto,
+            tipo:        monto >= 0 ? 'credito' : 'debito',
+            recibo:      '',
+            concepto:    '',
+            cuenta
+          });
+        }
+
+        if (nuevos.length === 0) { mostrarToast('No se encontraron movimientos', true); return; }
+
+        const { error } = await sb.from('movimientos').insert(nuevos);
+        if (error) { mostrarToast('Error guardando: ' + error.message, true); console.error(error); return; }
+        mostrarToast(`✅ ${nuevos.length} movimientos importados`);
+        hint.style.display = 'none';
+        cargarMovimientos();
       } catch(err) {
-        mostrarError('No se pudo leer el archivo. Verificá que sea un Excel válido de Bancolombia.');
+        mostrarToast('Error procesando el archivo', true);
+        console.error(err);
       }
     };
     reader.readAsArrayBuffer(archivo);
   }
 
-  function parsearMonto(texto) {
-    // Limpia "COP $324.900,00" o "COP -$7.481.200,00"
-    if (!texto || texto === '- -') return 0;
-    let str = String(texto);
-    const negativo = str.includes('-');
-    // Quita todo excepto dígitos, punto y coma
-    str = str.replace(/[^0-9.,]/g, '');
-    // Formato colombiano: puntos como miles, coma como decimal
-    str = str.replace(/\./g, '').replace(',', '.');
-    const num = parseFloat(str) || 0;
-    return negativo ? -num : num;
-  }
-
-  function formatFecha(valor) {
-    if (!valor) return '-';
-    // Ya viene como string "yyyy-mm-dd" por dateNF
-    if (typeof valor === 'string' && valor.includes('-')) {
-      const [y, m, d] = valor.split('-');
-      return `${d}/${m}/${y}`;
-    }
-    return valor;
-  }
-
-  function formatCOP(num) {
-    return new Intl.NumberFormat('es-CO', {
-      style: 'currency', currency: 'COP', minimumFractionDigits: 0, maximumFractionDigits: 0
-    }).format(Math.abs(num));
-  }
-
-  function parsearMovimientos(rows) {
-    ocultarError();
-    todosLosMovimientos = [];
-
-    for (let i = 0; i < rows.length; i++) {
-      const r = rows[i];
-      if (!r || r.length < 7) continue;
-
-      // Columnas reales del extracto Bancolombia:
-      // [0] Fecha  [1] Canal/Oficina  [2] Descripción  [3] Referencia1
-      // [4] Referencia2  [5] (ignorar)  [6] Monto con signo  [7] (ignorar CSS)
-
-      const fecha  = formatFecha(r[0]);
-      const canal  = r[1] || '-';
-      const desc   = r[2] || '-';
-      const ref1   = r[3] && r[3] !== '- -' ? String(r[3]) : '';
-      const ref2   = r[4] && r[4] !== '- -' && String(r[4]) !== String(r[3]) ? String(r[4]) : '';
-      const referencia = [ref1, ref2].filter(Boolean).join(' / ') || '-';
-      const monto  = parsearMonto(r[6]);
-      const tipo   = monto >= 0 ? 'credito' : 'debito';
-
-      todosLosMovimientos.push({ fecha, canal, desc, referencia, monto, tipo });
-    }
-
-    if (todosLosMovimientos.length === 0) {
-      mostrarError('No se encontraron movimientos en el archivo. Verificá que sea el extracto correcto.');
-      return;
-    }
-
+  async function agregarManual() {
+    const cuenta = document.getElementById('selectCuenta').value;
+    const hoy = new Date();
+    const fecha = `${String(hoy.getDate()).padStart(2,'0')}/${String(hoy.getMonth()+1).padStart(2,'0')}/${hoy.getFullYear()}`;
+    const { data, error } = await sb.from('movimientos').insert([{
+      fecha, canal: 'Manual', descripcion: '', referencia: '',
+      monto: 0, tipo: 'credito', recibo: '', concepto: '', cuenta
+    }]).select();
+    if (error) { mostrarToast('Error: ' + error.message, true); return; }
+    movimientos.unshift(data[0]);
+    hint.style.display = 'none';
     actualizarResumen();
-    aplicarFiltros();
-    document.getElementById('resumen').style.display = 'grid';
-    document.getElementById('filtros').style.display  = 'flex';
-    zone.style.display = 'none';
+    renderTabla();
   }
 
-  function actualizarResumen() {
-    const creditos = todosLosMovimientos.filter(m => m.tipo === 'credito').reduce((s,m) => s + m.monto, 0);
-    const debitos  = todosLosMovimientos.filter(m => m.tipo === 'debito').reduce((s,m) => s + m.monto, 0);
-    const neto = creditos + debitos; // debitos ya son negativos
-
-    document.getElementById('statTotal').textContent   = todosLosMovimientos.length;
-    document.getElementById('statCreditos').textContent = formatCOP(creditos);
-    document.getElementById('statDebitos').textContent  = formatCOP(debitos);
-    document.getElementById('statNeto').textContent     = formatCOP(neto);
-    document.getElementById('statNeto').style.color     = neto >= 0 ? 'var(--credit)' : 'var(--debit)';
+  async function guardarCampo(id, campo, valor) {
+    const update = { [campo]: valor };
+    if (campo === 'monto') {
+      const num = parsearMontoManual(valor);
+      update.monto = num;
+      update.tipo  = num >= 0 ? 'credito' : 'debito';
+    }
+    const { error } = await sb.from('movimientos').update(update).eq('id', id);
+    if (error) { mostrarToast('Error guardando', true); return; }
+    const idx = movimientos.findIndex(m => m.id === id);
+    if (idx !== -1) Object.assign(movimientos[idx], update);
+    if (campo === 'monto') { actualizarResumen(); renderTabla(); }
+    else actualizarResumen();
   }
 
-  function aplicarFiltros() {
-    const tipo   = document.getElementById('filtroTipo').value;
-    const buscar = document.getElementById('filtroBuscar').value.toLowerCase();
+  async function eliminar(id) {
+    if (!confirm('¿Eliminar este movimiento?')) return;
+    const { error } = await sb.from('movimientos').delete().eq('id', id);
+    if (error) { mostrarToast('Error eliminando', true); return; }
+    movimientos = movimientos.filter(m => m.id !== id);
+    actualizarResumen();
+    renderTabla();
+    mostrarToast('Movimiento eliminado');
+  }
 
-    const filtrados = todosLosMovimientos.filter(m => {
-      const matchTipo   = !tipo   || m.tipo === tipo;
-      const matchBuscar = !buscar || m.desc.toLowerCase().includes(buscar) || m.referencia.toLowerCase().includes(buscar) || m.canal.toLowerCase().includes(buscar);
-      return matchTipo && matchBuscar;
+  function renderTabla() {
+    const tipo     = document.getElementById('filtroTipo').value;
+    const concepto = document.getElementById('filtroConcepto').value;
+    const buscar   = document.getElementById('filtroBuscar').value.toLowerCase();
+
+    const filtrados = movimientos.filter(m => {
+      const matchTipo     = !tipo     || m.tipo === tipo;
+      const matchConcepto = !concepto || m.concepto === concepto;
+      const matchBuscar   = !buscar   ||
+        (m.descripcion||'').toLowerCase().includes(buscar) ||
+        (m.referencia ||'').toLowerCase().includes(buscar) ||
+        (m.recibo     ||'').toLowerCase().includes(buscar) ||
+        (m.canal      ||'').toLowerCase().includes(buscar);
+      return matchTipo && matchConcepto && matchBuscar;
     });
 
-    renderTabla(filtrados);
     document.getElementById('contadorFiltrado').textContent =
-      filtrados.length === todosLosMovimientos.length
+      filtrados.length === movimientos.length
         ? `${filtrados.length} movimientos`
-        : `${filtrados.length} de ${todosLosMovimientos.length} movimientos`;
-  }
+        : `${filtrados.length} de ${movimientos.length}`;
 
-  function renderTabla(movimientos) {
     const tbody = document.getElementById('tablaCuerpo');
-    if (movimientos.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="7"><div class="empty-state"><div class="icon">🔍</div><p>No hay movimientos que coincidan con los filtros</p></div></td></tr>`;
+    if (filtrados.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="10"><div class="empty-state"><div class="icon">📭</div><p>Sin movimientos. Cargá un Excel o agregá uno manualmente.</p></div></td></tr>`;
       return;
     }
 
-    tbody.innerHTML = movimientos.map((m, i) => `
+    tbody.innerHTML = filtrados.map((m, i) => `
       <tr>
-        <td style="color:var(--muted);font-size:0.78rem;">${i + 1}</td>
-        <td style="white-space:nowrap;">${m.fecha}</td>
-        <td style="color:var(--muted);font-size:0.82rem;">${m.canal}</td>
-        <td>${m.desc}</td>
-        <td style="color:var(--muted);font-size:0.8rem;">${m.referencia}</td>
-        <td><span class="badge badge-${m.tipo}">${m.tipo === 'credito' ? 'Ingreso' : 'Egreso'}</span></td>
-        <td class="monto-${m.tipo}" style="text-align:right;white-space:nowrap;">
-          ${m.tipo === 'credito' ? '+' : '−'} ${formatCOP(m.monto)}
+        <td style="color:var(--muted);font-size:0.75rem;">${i+1}</td>
+        <td>
+          <input class="input-tabla" value="${esc(m.fecha)}" style="width:90px;"
+            onblur="guardarCampo('${m.id}','fecha',this.value)">
+        </td>
+        <td style="color:var(--muted);font-size:0.8rem;">${esc(m.canal)}</td>
+        <td>
+          <input class="input-tabla" value="${esc(m.descripcion)}" style="min-width:150px;"
+            onblur="guardarCampo('${m.id}','descripcion',this.value)">
+        </td>
+        <td>
+          <input class="input-tabla" value="${esc(m.referencia)}" style="min-width:100px;"
+            onblur="guardarCampo('${m.id}','referencia',this.value)">
+        </td>
+        <td><span class="badge badge-${m.tipo}">${m.tipo==='credito'?'Ingreso':'Egreso'}</span></td>
+        <td>
+          <input class="input-tabla monto-${m.tipo}" value="${formatMontoRaw(m.monto)}"
+            style="width:110px;text-align:right;"
+            onblur="guardarCampo('${m.id}','monto',this.value)">
+        </td>
+        <td>
+          <input class="input-tabla" value="${esc(m.recibo)}" placeholder="CI-000000..."
+            style="min-width:120px;"
+            onblur="guardarCampo('${m.id}','recibo',this.value)">
+        </td>
+        <td>
+          <select class="input-tabla" onchange="guardarCampo('${m.id}','concepto',this.value)">
+            ${CONCEPTOS.map(c=>`<option ${c===m.concepto?'selected':''}>${c}</option>`).join('')}
+          </select>
+        </td>
+        <td>
+          <button class="btn-del" onclick="eliminar('${m.id}')" title="Eliminar">🗑</button>
         </td>
       </tr>
     `).join('');
   }
 
-  function mostrarError(msg) {
-    const el = document.getElementById('alertaError');
-    el.textContent = '⚠️ ' + msg;
-    el.style.display = 'block';
+  function actualizarResumen() {
+    const creds = movimientos.filter(m=>m.tipo==='credito').reduce((s,m)=>s+Number(m.monto),0);
+    const debs  = movimientos.filter(m=>m.tipo==='debito' ).reduce((s,m)=>s+Number(m.monto),0);
+    const neto  = creds + debs;
+    document.getElementById('statTotal').textContent    = movimientos.length;
+    document.getElementById('statCreditos').textContent = formatCOP(creds);
+    document.getElementById('statDebitos').textContent  = formatCOP(Math.abs(debs));
+    document.getElementById('statNeto').textContent     = formatCOP(neto);
+    document.getElementById('statNeto').style.color     = neto>=0?'var(--credit)':'var(--debit)';
   }
-  function ocultarError() {
-    document.getElementById('alertaError').style.display = 'none';
+
+  function exportarExcel() {
+    const cuenta = document.getElementById('selectCuenta').value;
+    const data = movimientos.map(m => ({
+      Fecha: m.fecha, Canal: m.canal, Descripción: m.descripcion,
+      Referencia: m.referencia, Tipo: m.tipo === 'credito' ? 'Ingreso' : 'Egreso',
+      Monto: Number(m.monto), Recibo: m.recibo, Concepto: m.concepto
+    }));
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Movimientos');
+    XLSX.writeFile(wb, `Movimientos_${cuenta.replace(/ /g,'_')}.xlsx`);
+  }
+
+  function parsearMonto(texto) {
+    if (!texto || texto === '- -') return 0;
+    const str = String(texto);
+    const neg = str.includes('-');
+    const clean = str.replace(/[^0-9,]/g,'').replace(/\./g,'').replace(',','.');
+    const num = parseFloat(clean) || 0;
+    return neg ? -num : num;
+  }
+  function parsearMontoManual(v) {
+    const str = String(v).trim();
+    const neg = str.startsWith('-');
+    const clean = str.replace(/[^0-9,]/g,'').replace(/\./g,'').replace(',','.');
+    const num = parseFloat(clean) || 0;
+    return neg ? -num : num;
+  }
+  function formatFecha(v) {
+    if (!v) return '';
+    if (typeof v === 'string' && v.includes('-')) {
+      const [y,m,d] = v.split('-'); return `${d}/${m}/${y}`;
+    }
+    return String(v);
+  }
+  function formatCOP(n) {
+    return new Intl.NumberFormat('es-CO',{style:'currency',currency:'COP',minimumFractionDigits:0,maximumFractionDigits:0}).format(n);
+  }
+  function formatMontoRaw(n) {
+    return Number(n).toLocaleString('es-CO');
+  }
+  function esc(s) { return (s||'').replace(/"/g,'&quot;').replace(/</g,'&lt;'); }
+  function mostrarToast(msg, error=false) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.className = 'toast show' + (error?' error':'');
+    setTimeout(()=>t.className='toast', 3500);
   }
 </script>
 </body>
