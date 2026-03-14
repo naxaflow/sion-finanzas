@@ -1,144 +1,109 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
+
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Movimientos Banco</title>
-<script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+
+<title>SION Finanzas</title>
 
 <style>
-body{font-family:Arial;margin:40px;background:#f4f6f8;}
-h1{color:#1f2937;}
-table{margin-top:30px;border-collapse:collapse;width:100%;background:white;}
-th,td{border:1px solid #ddd;padding:8px;font-size:14px;}
-th{background:#1f2937;color:white;}
-input,select{width:100%;border:none;}
-button{background:#1f2937;color:white;border:none;padding:8px 15px;cursor:pointer;margin-top:10px;}
+
+body{
+font-family: Arial;
+margin:0;
+background:#f4f6f8;
+}
+
+header{
+background:#1f2937;
+color:white;
+padding:20px;
+}
+
+.container{
+padding:30px;
+}
+
+.cards{
+display:grid;
+grid-template-columns: repeat(auto-fit,minmax(220px,1fr));
+gap:20px;
+}
+
+.card{
+background:white;
+padding:25px;
+border-radius:10px;
+box-shadow:0 4px 8px rgba(0,0,0,0.08);
+cursor:pointer;
+}
+
+.card:hover{
+transform:translateY(-4px);
+}
+
+footer{
+margin-top:40px;
+padding:15px;
+text-align:center;
+color:#888;
+}
+
 </style>
+
 </head>
 
 <body>
 
-<h1>Movimientos del Banco</h1>
+<header>
+<h1>SION Finanzas</h1>
+<p>Sistema de conciliación y control financiero</p>
+</header>
 
-<p>Subir archivo Excel del banco</p>
-<input type="file" id="excelFile">
+<div class="container">
 
-<table id="tablaBanco">
-<thead>
-<tr>
-<th>Fecha</th>
-<th>Descripción</th>
-<th>Valor</th>
-<th>Recibo</th>
-<th>Concepto</th>
-</tr>
-</thead>
-<tbody></tbody>
-</table>
+<h2>Panel Principal</h2>
 
-<br>
-<button onclick="agregarMovimiento()">+ Agregar movimiento manual</button>
+<div class="cards">
 
-<br><br>
-<a href="index.html">← Volver</a>
+<div class="card" onclick="location.href='pagos.html'">
+<h3>Pagos del Programa</h3>
+<p>Cargar pagos desde Excel del sistema.</p>
+</div>
 
-<script>
+<div class="card" onclick="location.href='movimientos_banco.html'">
+<h3>Movimientos Bancarios</h3>
+<p>Registrar movimientos del banco.</p>
+</div>
 
-const conceptos = [
-"Seguridad Social",
-"Gastos Bancarios",
-"Hernan",
-"Incapacidad",
-"Inc-Pagada",
-"Ingreso Intereses",
-"Otros gastos",
-"Otros Ingresos",
-"Planillas Pagadas"
-]
+<div class="card" onclick="alert('Módulo en construcción')">
+<h3>Conciliación</h3>
+<p>Cruzar pagos del programa con banco.</p>
+</div>
 
-document.getElementById("excelFile").addEventListener("change",leerBanco)
+<div class="card" onclick="alert('Módulo en construcción')">
+<h3>Movimientos Contables</h3>
+<p>Registrar asientos contables manuales.</p>
+</div>
 
-function excelFecha(numero){
-let fecha = new Date((numero - 25569) * 86400 * 1000)
-return fecha.toISOString().split("T")[0]
-}
+<div class="card" onclick="alert('Módulo en construcción')">
+<h3>Comisiones</h3>
+<p>Calcular comisiones por afiliación, reintegro y recaudo.</p>
+</div>
 
-function leerBanco(e){
+<div class="card" onclick="alert('Módulo en construcción')">
+<h3>Reportes</h3>
+<p>Análisis financiero y flujo de dinero.</p>
+</div>
 
-const archivo = e.target.files[0]
+</div>
 
-const reader = new FileReader()
+</div>
 
-reader.onload = function(event){
-
-const data = new Uint8Array(event.target.result)
-const workbook = XLSX.read(data,{type:"array"})
-const sheet = workbook.Sheets[workbook.SheetNames[0]]
-const rows = XLSX.utils.sheet_to_json(sheet)
-
-mostrarBanco(rows)
-
-}
-
-reader.readAsArrayBuffer(archivo)
-
-}
-
-function mostrarBanco(rows){
-
-const tbody = document.querySelector("#tablaBanco tbody")
-tbody.innerHTML=""
-
-rows.forEach(r=>{
-
-let fecha = r["Fecha"] || r["FECHA"] || ""
-let descripcion = r["Descripción"] || r["Descripcion"] || r["DETALLE"] || ""
-
-let debito = Number(r["Débito"] || r["Debito"] || 0)
-let credito = Number(r["Crédito"] || r["Credito"] || 0)
-
-let valor = credito - debito
-
-if(typeof fecha === "number"){
-fecha = excelFecha(fecha)
-}
-
-crearFila(fecha,descripcion,valor)
-
-})
-
-}
-
-function crearFila(fecha,descripcion,valor){
-
-const tbody = document.querySelector("#tablaBanco tbody")
-
-let selectConcepto="<select>"
-conceptos.forEach(c=>{
-selectConcepto+=`<option>${c}</option>`
-})
-selectConcepto+="</select>"
-
-let tr=document.createElement("tr")
-
-tr.innerHTML=`
-<td><input value="${fecha}"></td>
-<td><input value="${descripcion}"></td>
-<td><input value="${valor}"></td>
-<td><input placeholder="Recibo"></td>
-<td>${selectConcepto}</td>
-`
-
-tbody.appendChild(tr)
-
-}
-
-function agregarMovimiento(){
-crearFila("","","")
-}
-
-</script>
+<footer>
+SION ERP • Sistema financiero
+</footer>
 
 </body>
 </html>
