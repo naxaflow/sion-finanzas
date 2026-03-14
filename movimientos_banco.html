@@ -1,1 +1,211 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
 
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>Movimientos Banco</title>
+
+<script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+
+<style>
+
+body{
+font-family: Arial;
+margin:40px;
+background:#f4f6f8;
+}
+
+h1{
+color:#1f2937;
+}
+
+table{
+margin-top:30px;
+border-collapse: collapse;
+width:100%;
+background:white;
+}
+
+th,td{
+border:1px solid #ddd;
+padding:8px;
+font-size:14px;
+}
+
+th{
+background:#1f2937;
+color:white;
+}
+
+input{
+width:100%;
+border:none;
+}
+
+select{
+width:100%;
+border:none;
+}
+
+button{
+background:#1f2937;
+color:white;
+border:none;
+padding:8px 15px;
+cursor:pointer;
+margin-top:10px;
+}
+
+</style>
+
+</head>
+
+<body>
+
+<h1>Movimientos del Banco</h1>
+
+<p>Subir archivo Excel del banco</p>
+
+<input type="file" id="excelFile">
+
+<table id="tablaBanco">
+
+<thead>
+
+<tr>
+
+<th>Fecha</th>
+<th>Descripción</th>
+<th>Valor</th>
+<th>Recibo</th>
+<th>Concepto</th>
+
+</tr>
+
+</thead>
+
+<tbody>
+
+</tbody>
+
+</table>
+
+<br>
+
+<button onclick="agregarMovimiento()">+ Agregar movimiento manual</button>
+
+<br><br>
+
+<a href="index.html">← Volver al panel</a>
+
+<script>
+
+const conceptos = [
+
+"Seguridad Social",
+"Gastos Bancarios",
+"Hernan",
+"Incapacidad",
+"Inc-Pagada",
+"Ingreso Intereses",
+"Otros gastos",
+"Otros Ingresos",
+"Planillas Pagadas"
+
+]
+
+document.getElementById("excelFile").addEventListener("change",leerBanco)
+
+function leerBanco(e){
+
+const archivo = e.target.files[0]
+
+const reader = new FileReader()
+
+reader.onload = function(event){
+
+const data = new Uint8Array(event.target.result)
+
+const workbook = XLSX.read(data,{type:"array"})
+
+const sheet = workbook.Sheets[workbook.SheetNames[0]]
+
+const rows = XLSX.utils.sheet_to_json(sheet,{header:1})
+
+mostrarBanco(rows)
+
+}
+
+reader.readAsArrayBuffer(archivo)
+
+}
+
+function mostrarBanco(rows){
+
+const tbody = document.querySelector("#tablaBanco tbody")
+
+tbody.innerHTML = ""
+
+for(let i=1;i<rows.length;i++){
+
+let r = rows[i]
+
+let fecha = r[0] || ""
+let descripcion = r[1] || ""
+let debito = Number(r[2]) || 0
+let credito = Number(r[3]) || 0
+
+let valor = credito - debito
+
+crearFila(fecha,descripcion,valor)
+
+}
+
+}
+
+function crearFila(fecha,descripcion,valor){
+
+const tbody = document.querySelector("#tablaBanco tbody")
+
+let tr = document.createElement("tr")
+
+let selectConcepto = "<select>"
+
+conceptos.forEach(c=>{
+
+selectConcepto += `<option>${c}</option>`
+
+})
+
+selectConcepto += "</select>"
+
+tr.innerHTML = `
+
+<td><input value="${fecha}"></td>
+
+<td><input value="${descripcion}"></td>
+
+<td><input value="${valor}"></td>
+
+<td><input placeholder="Recibo"></td>
+
+<td>${selectConcepto}</td>
+
+`
+
+tbody.appendChild(tr)
+
+}
+
+function agregarMovimiento(){
+
+crearFila("","","")
+
+}
+
+</script>
+
+</body>
+</html>
