@@ -33,7 +33,7 @@
   header a { color: #93c5fd; text-decoration: none; font-size: 0.85rem; }
   header a:hover { text-decoration: underline; }
 
-  .container { padding: 30px; max-width: 1400px; margin: 0 auto; }
+  .container { padding: 30px; max-width: 1500px; margin: 0 auto; }
 
   .top-bar { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; margin-bottom: 24px; }
   .top-bar select {
@@ -49,6 +49,7 @@
   .btn-primary { background: var(--accent); color: white; }
   .btn-secondary { background: white; color: var(--text); border: 1px solid var(--border); }
   .btn-excel { background: #166534; color: white; }
+  .btn-danger { background: var(--danger); color: white; }
 
   .upload-zone {
     background: var(--surface); border: 2px dashed var(--border); border-radius: 12px;
@@ -58,6 +59,26 @@
   .upload-zone .icon { font-size: 2rem; margin-bottom: 8px; }
   .upload-zone h3 { font-size: 0.95rem; margin-bottom: 4px; }
   .upload-zone p { font-size: 0.8rem; color: var(--muted); }
+
+  /* Modal duplicados */
+  .modal-overlay {
+    display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5);
+    z-index: 1000; align-items: center; justify-content: center;
+  }
+  .modal-overlay.show { display: flex; }
+  .modal {
+    background: white; border-radius: 12px; padding: 28px; max-width: 600px; width: 90%;
+    max-height: 80vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+  }
+  .modal h3 { font-size: 1rem; margin-bottom: 8px; }
+  .modal p { font-size: 0.85rem; color: var(--muted); margin-bottom: 16px; }
+  .modal-list { list-style: none; margin-bottom: 20px; }
+  .modal-list li {
+    padding: 8px 12px; border-radius: 6px; background: #f8fafc;
+    margin-bottom: 6px; font-size: 0.82rem; border-left: 3px solid var(--accent);
+  }
+  .modal-list li.dup { border-left-color: var(--danger); background: var(--danger-light); }
+  .modal-actions { display: flex; gap: 10px; justify-content: flex-end; }
 
   .resumen {
     display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
@@ -90,15 +111,15 @@
   .tabla-header span { font-size: 0.8rem; color: var(--muted); }
   .table-scroll { overflow-x: auto; }
 
-  table { width: 100%; border-collapse: collapse; font-size: 0.83rem; }
+  table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
   thead th {
-    background: #f8fafc; padding: 10px 12px; text-align: left;
-    font-size: 0.72rem; font-weight: 600; text-transform: uppercase;
+    background: #f8fafc; padding: 10px 10px; text-align: left;
+    font-size: 0.7rem; font-weight: 600; text-transform: uppercase;
     letter-spacing: 0.04em; color: var(--muted); border-bottom: 1px solid var(--border); white-space: nowrap;
   }
   tbody tr { border-bottom: 1px solid #f1f3f5; transition: background 0.1s; }
   tbody tr:hover { background: #f8fafb; }
-  tbody td { padding: 8px 12px; vertical-align: middle; }
+  tbody td { padding: 7px 10px; vertical-align: middle; }
 
   .monto-credito { color: var(--credit); font-weight: 600; }
   .monto-debito  { color: var(--debit);  font-weight: 600; }
@@ -108,8 +129,8 @@
   .badge-debito  { background: var(--danger-light);  color: var(--debit); }
 
   .input-tabla {
-    border: 1px solid transparent; border-radius: 5px; padding: 4px 7px;
-    font-size: 0.82rem; width: 100%; background: transparent; color: var(--text); transition: border-color 0.15s;
+    border: 1px solid transparent; border-radius: 5px; padding: 3px 6px;
+    font-size: 0.81rem; width: 100%; background: transparent; color: var(--text); transition: border-color 0.15s;
   }
   .input-tabla:hover { border-color: var(--border); }
   .input-tabla:focus { border-color: var(--accent); outline: none; background: white; }
@@ -117,7 +138,7 @@
 
   .btn-del {
     background: none; border: none; color: #d1d5db; cursor: pointer;
-    font-size: 1rem; padding: 2px 6px; border-radius: 4px; transition: color 0.15s;
+    font-size: 0.95rem; padding: 2px 5px; border-radius: 4px; transition: color 0.15s;
   }
   .btn-del:hover { color: var(--danger); }
 
@@ -163,7 +184,7 @@
   <div class="upload-zone" id="uploadHint" onclick="document.getElementById('excelFile').click()">
     <div class="icon">📂</div>
     <h3>Arrastrá el extracto bancario aquí o hacé clic para seleccionar</h3>
-    <p>Formato .xlsx exportado desde la sucursal virtual de Bancolombia</p>
+    <p>Formato .xlsx exportado desde la sucursal virtual — detecta duplicados automáticamente</p>
   </div>
 
   <div class="resumen">
@@ -206,7 +227,7 @@
       <option>Planillas Pagadas</option>
     </select>
     <label>Buscar:</label>
-    <input type="text" id="filtroBuscar" placeholder="Descripción, recibo..." oninput="renderTabla()">
+    <input type="text" id="filtroBuscar" placeholder="Descripción, recibo, planilla..." oninput="renderTabla()">
   </div>
 
   <div class="tabla-wrap">
@@ -226,16 +247,30 @@
             <th>Tipo</th>
             <th>Monto</th>
             <th>Recibo</th>
+            <th>N° Planilla</th>
             <th>Concepto</th>
             <th></th>
           </tr>
         </thead>
         <tbody id="tablaCuerpo">
-          <tr><td colspan="10">
+          <tr><td colspan="11">
             <div class="empty-state"><div class="icon">⏳</div><p>Cargando movimientos...</p></div>
           </td></tr>
         </tbody>
       </table>
+    </div>
+  </div>
+</div>
+
+<!-- Modal duplicados -->
+<div class="modal-overlay" id="modalDups">
+  <div class="modal">
+    <h3>⚠️ Registros detectados</h3>
+    <p id="modalMsg"></p>
+    <ul class="modal-list" id="modalLista"></ul>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="cerrarModal()">Cancelar</button>
+      <button class="btn btn-primary" id="btnImportar" onclick="confirmarImport()">Importar solo nuevos</button>
     </div>
   </div>
 </div>
@@ -257,9 +292,12 @@
   ];
 
   let movimientos = [];
+  let pendientesImport = []; // registros nuevos listos para importar
 
+  // ── Init ─────────────────────────────────────────────────
   document.getElementById('excelFile').addEventListener('change', e => {
     if (e.target.files[0]) procesarExcel(e.target.files[0]);
+    e.target.value = '';
   });
 
   const hint = document.getElementById('uploadHint');
@@ -272,11 +310,12 @@
 
   cargarMovimientos();
 
+  // ── Cargar desde Supabase ─────────────────────────────────
   async function cargarMovimientos() {
     const cuenta = document.getElementById('selectCuenta').value;
     document.getElementById('tituloTabla').textContent = cuenta;
     document.getElementById('tablaCuerpo').innerHTML =
-      `<tr><td colspan="10"><div class="empty-state"><div class="icon">⏳</div><p>Cargando...</p></div></td></tr>`;
+      `<tr><td colspan="11"><div class="empty-state"><div class="icon">⏳</div><p>Cargando...</p></div></td></tr>`;
 
     const { data, error } = await sb
       .from('movimientos')
@@ -291,8 +330,9 @@
     if (movimientos.length > 0) hint.style.display = 'none';
   }
 
+  // ── Procesar Excel con anti-duplicados ────────────────────
   async function procesarExcel(archivo) {
-    mostrarToast('⏳ Procesando archivo...');
+    mostrarToast('⏳ Analizando archivo...');
     const reader = new FileReader();
     reader.onload = async function(e) {
       try {
@@ -300,8 +340,9 @@
         const ws = wb.Sheets[wb.SheetNames[0]];
         const rows = XLSX.utils.sheet_to_json(ws, { header: 1, raw: false, dateNF: 'yyyy-mm-dd' });
         const cuenta = document.getElementById('selectCuenta').value;
-        const nuevos = [];
 
+        // Parsear filas del Excel
+        const delExcel = [];
         for (let i = 0; i < rows.length; i++) {
           const r = rows[i];
           if (!r || r.length < 3) continue;
@@ -309,7 +350,7 @@
           if (monto === 0 && !r[2]) continue;
           const ref1 = r[3] && r[3] !== '- -' ? String(r[3]) : '';
           const ref2 = r[4] && r[4] !== '- -' && String(r[4]) !== ref1 ? String(r[4]) : '';
-          nuevos.push({
+          delExcel.push({
             fecha:       formatFecha(r[0]),
             canal:       String(r[1] || ''),
             descripcion: String(r[2] || ''),
@@ -318,17 +359,35 @@
             tipo:        monto >= 0 ? 'credito' : 'debito',
             recibo:      '',
             concepto:    '',
+            numero_planilla: '',
             cuenta
           });
         }
 
-        if (nuevos.length === 0) { mostrarToast('No se encontraron movimientos', true); return; }
+        if (delExcel.length === 0) { mostrarToast('No se encontraron movimientos', true); return; }
 
-        const { error } = await sb.from('movimientos').insert(nuevos);
-        if (error) { mostrarToast('Error guardando: ' + error.message, true); console.error(error); return; }
-        mostrarToast(`✅ ${nuevos.length} movimientos importados`);
-        hint.style.display = 'none';
-        cargarMovimientos();
+        // Clave de duplicado: fecha + descripcion + monto
+        const claveExistente = new Set(
+          movimientos.map(m => `${m.fecha}|${(m.descripcion||'').toLowerCase()}|${Number(m.monto)}`)
+        );
+
+        const nuevos = [];
+        const duplicados = [];
+
+        for (const reg of delExcel) {
+          const clave = `${reg.fecha}|${reg.descripcion.toLowerCase()}|${Number(reg.monto)}`;
+          if (claveExistente.has(clave)) {
+            duplicados.push(reg);
+          } else {
+            nuevos.push(reg);
+            claveExistente.add(clave); // evitar duplicados dentro del mismo archivo
+          }
+        }
+
+        // Mostrar modal con resultado
+        pendientesImport = nuevos;
+        mostrarModal(nuevos, duplicados);
+
       } catch(err) {
         mostrarToast('Error procesando el archivo', true);
         console.error(err);
@@ -337,13 +396,62 @@
     reader.readAsArrayBuffer(archivo);
   }
 
+  // ── Modal duplicados ──────────────────────────────────────
+  function mostrarModal(nuevos, duplicados) {
+    const lista = document.getElementById('modalLista');
+    const msg   = document.getElementById('modalMsg');
+    lista.innerHTML = '';
+
+    if (duplicados.length === 0 && nuevos.length === 0) {
+      mostrarToast('No hay registros nuevos para importar', true);
+      return;
+    }
+
+    msg.textContent = `Se encontraron ${nuevos.length} registros nuevos y ${duplicados.length} ya existentes (duplicados).`;
+
+    nuevos.forEach(r => {
+      const li = document.createElement('li');
+      li.textContent = `✅ NUEVO — ${r.fecha} | ${r.descripcion} | ${formatCOP(r.monto)}`;
+      lista.appendChild(li);
+    });
+
+    duplicados.forEach(r => {
+      const li = document.createElement('li');
+      li.className = 'dup';
+      li.textContent = `🔁 DUPLICADO — ${r.fecha} | ${r.descripcion} | ${formatCOP(r.monto)}`;
+      lista.appendChild(li);
+    });
+
+    document.getElementById('btnImportar').textContent =
+      nuevos.length > 0 ? `Importar ${nuevos.length} nuevos` : 'No hay nuevos';
+    document.getElementById('btnImportar').disabled = nuevos.length === 0;
+    document.getElementById('modalDups').classList.add('show');
+  }
+
+  function cerrarModal() {
+    document.getElementById('modalDups').classList.remove('show');
+    pendientesImport = [];
+  }
+
+  async function confirmarImport() {
+    if (pendientesImport.length === 0) return;
+    cerrarModal();
+    mostrarToast('⏳ Guardando...');
+    const { error } = await sb.from('movimientos').insert(pendientesImport);
+    if (error) { mostrarToast('Error guardando: ' + error.message, true); console.error(error); return; }
+    mostrarToast(`✅ ${pendientesImport.length} movimientos importados`);
+    hint.style.display = 'none';
+    cargarMovimientos();
+  }
+
+  // ── Agregar manual ────────────────────────────────────────
   async function agregarManual() {
     const cuenta = document.getElementById('selectCuenta').value;
     const hoy = new Date();
     const fecha = `${String(hoy.getDate()).padStart(2,'0')}/${String(hoy.getMonth()+1).padStart(2,'0')}/${hoy.getFullYear()}`;
     const { data, error } = await sb.from('movimientos').insert([{
       fecha, canal: 'Manual', descripcion: '', referencia: '',
-      monto: 0, tipo: 'credito', recibo: '', concepto: '', cuenta
+      monto: 0, tipo: 'credito', recibo: '', concepto: '', numero_planilla: '', cuenta
     }]).select();
     if (error) { mostrarToast('Error: ' + error.message, true); return; }
     movimientos.unshift(data[0]);
@@ -352,6 +460,7 @@
     renderTabla();
   }
 
+  // ── Guardar campo ─────────────────────────────────────────
   async function guardarCampo(id, campo, valor) {
     const update = { [campo]: valor };
     if (campo === 'monto') {
@@ -367,6 +476,7 @@
     else actualizarResumen();
   }
 
+  // ── Eliminar ──────────────────────────────────────────────
   async function eliminar(id) {
     if (!confirm('¿Eliminar este movimiento?')) return;
     const { error } = await sb.from('movimientos').delete().eq('id', id);
@@ -377,6 +487,7 @@
     mostrarToast('Movimiento eliminado');
   }
 
+  // ── Render tabla ──────────────────────────────────────────
   function renderTabla() {
     const tipo     = document.getElementById('filtroTipo').value;
     const concepto = document.getElementById('filtroConcepto').value;
@@ -386,10 +497,11 @@
       const matchTipo     = !tipo     || m.tipo === tipo;
       const matchConcepto = !concepto || m.concepto === concepto;
       const matchBuscar   = !buscar   ||
-        (m.descripcion||'').toLowerCase().includes(buscar) ||
-        (m.referencia ||'').toLowerCase().includes(buscar) ||
-        (m.recibo     ||'').toLowerCase().includes(buscar) ||
-        (m.canal      ||'').toLowerCase().includes(buscar);
+        (m.descripcion     ||'').toLowerCase().includes(buscar) ||
+        (m.referencia      ||'').toLowerCase().includes(buscar) ||
+        (m.recibo          ||'').toLowerCase().includes(buscar) ||
+        (m.numero_planilla ||'').toLowerCase().includes(buscar) ||
+        (m.canal           ||'').toLowerCase().includes(buscar);
       return matchTipo && matchConcepto && matchBuscar;
     });
 
@@ -400,7 +512,7 @@
 
     const tbody = document.getElementById('tablaCuerpo');
     if (filtrados.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="10"><div class="empty-state"><div class="icon">📭</div><p>Sin movimientos. Cargá un Excel o agregá uno manualmente.</p></div></td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="11"><div class="empty-state"><div class="icon">📭</div><p>Sin movimientos. Cargá un Excel o agregá uno manualmente.</p></div></td></tr>`;
       return;
     }
 
@@ -408,28 +520,33 @@
       <tr>
         <td style="color:var(--muted);font-size:0.75rem;">${i+1}</td>
         <td>
-          <input class="input-tabla" value="${esc(m.fecha)}" style="width:90px;"
+          <input class="input-tabla" value="${esc(m.fecha)}" style="width:88px;"
             onblur="guardarCampo('${m.id}','fecha',this.value)">
         </td>
-        <td style="color:var(--muted);font-size:0.8rem;">${esc(m.canal)}</td>
+        <td style="color:var(--muted);font-size:0.78rem;">${esc(m.canal)}</td>
         <td>
-          <input class="input-tabla" value="${esc(m.descripcion)}" style="min-width:150px;"
+          <input class="input-tabla" value="${esc(m.descripcion)}" style="min-width:140px;"
             onblur="guardarCampo('${m.id}','descripcion',this.value)">
         </td>
         <td>
-          <input class="input-tabla" value="${esc(m.referencia)}" style="min-width:100px;"
+          <input class="input-tabla" value="${esc(m.referencia)}" style="min-width:90px;"
             onblur="guardarCampo('${m.id}','referencia',this.value)">
         </td>
         <td><span class="badge badge-${m.tipo}">${m.tipo==='credito'?'Ingreso':'Egreso'}</span></td>
         <td>
           <input class="input-tabla monto-${m.tipo}" value="${formatMontoRaw(m.monto)}"
-            style="width:110px;text-align:right;"
+            style="width:105px;text-align:right;"
             onblur="guardarCampo('${m.id}','monto',this.value)">
         </td>
         <td>
           <input class="input-tabla" value="${esc(m.recibo)}" placeholder="CI-000000..."
-            style="min-width:120px;"
+            style="min-width:110px;"
             onblur="guardarCampo('${m.id}','recibo',this.value)">
+        </td>
+        <td>
+          <input class="input-tabla" value="${esc(m.numero_planilla)}" placeholder="N° planilla..."
+            style="min-width:100px;"
+            onblur="guardarCampo('${m.id}','numero_planilla',this.value)">
         </td>
         <td>
           <select class="input-tabla" onchange="guardarCampo('${m.id}','concepto',this.value)">
@@ -443,6 +560,7 @@
     `).join('');
   }
 
+  // ── Resumen ───────────────────────────────────────────────
   function actualizarResumen() {
     const creds = movimientos.filter(m=>m.tipo==='credito').reduce((s,m)=>s+Number(m.monto),0);
     const debs  = movimientos.filter(m=>m.tipo==='debito' ).reduce((s,m)=>s+Number(m.monto),0);
@@ -454,12 +572,17 @@
     document.getElementById('statNeto').style.color     = neto>=0?'var(--credit)':'var(--debit)';
   }
 
+  // ── Exportar Excel ────────────────────────────────────────
   function exportarExcel() {
     const cuenta = document.getElementById('selectCuenta').value;
     const data = movimientos.map(m => ({
       Fecha: m.fecha, Canal: m.canal, Descripción: m.descripcion,
-      Referencia: m.referencia, Tipo: m.tipo === 'credito' ? 'Ingreso' : 'Egreso',
-      Monto: Number(m.monto), Recibo: m.recibo, Concepto: m.concepto
+      Referencia: m.referencia,
+      Tipo: m.tipo === 'credito' ? 'Ingreso' : 'Egreso',
+      Monto: Number(m.monto),
+      Recibo: m.recibo,
+      'N° Planilla': m.numero_planilla,
+      Concepto: m.concepto
     }));
     const ws = XLSX.utils.json_to_sheet(data);
     const wb = XLSX.utils.book_new();
@@ -467,20 +590,19 @@
     XLSX.writeFile(wb, `Movimientos_${cuenta.replace(/ /g,'_')}.xlsx`);
   }
 
+  // ── Helpers ───────────────────────────────────────────────
   function parsearMonto(texto) {
     if (!texto || texto === '- -') return 0;
     const str = String(texto);
     const neg = str.includes('-');
     const clean = str.replace(/[^0-9,]/g,'').replace(/\./g,'').replace(',','.');
-    const num = parseFloat(clean) || 0;
-    return neg ? -num : num;
+    return neg ? -(parseFloat(clean)||0) : (parseFloat(clean)||0);
   }
   function parsearMontoManual(v) {
     const str = String(v).trim();
     const neg = str.startsWith('-');
     const clean = str.replace(/[^0-9,]/g,'').replace(/\./g,'').replace(',','.');
-    const num = parseFloat(clean) || 0;
-    return neg ? -num : num;
+    return neg ? -(parseFloat(clean)||0) : (parseFloat(clean)||0);
   }
   function formatFecha(v) {
     if (!v) return '';
