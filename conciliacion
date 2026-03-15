@@ -1,0 +1,673 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Conciliación Bancaria – SION Finanzas</title>
+<script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root {
+    --bg: #f0f2f5;
+    --surface: #fff;
+    --header-bg: #0f2937;
+    --accent: #1e8a5e;
+    --accent-light: #e6f5ef;
+    --danger: #dc2626;
+    --danger-light: #fef2f2;
+    --warning: #d97706;
+    --warning-light: #fffbeb;
+    --text: #1f2937;
+    --muted: #6b7280;
+    --border: #e5e7eb;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', Arial, sans-serif; background: var(--bg); color: var(--text); }
+
+  header {
+    background: var(--header-bg); color: white; padding: 20px 30px;
+    display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;
+  }
+  header h1 { font-size: 1.4rem; font-weight: 700; }
+  header p  { font-size: 0.85rem; opacity: 0.7; margin-top: 2px; }
+  header a  { color: #93c5fd; text-decoration: none; font-size: 0.85rem; }
+
+  .container { padding: 30px; max-width: 1400px; margin: 0 auto; }
+  h2 { font-size: 1.15rem; margin-bottom: 24px; }
+
+  /* Pasos */
+  .pasos {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 20px; margin-bottom: 30px;
+  }
+  .paso {
+    background: var(--surface); border-radius: 12px; padding: 24px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.07); border: 2px solid var(--border);
+    transition: border-color 0.2s;
+  }
+  .paso.activo  { border-color: var(--accent); }
+  .paso.listo   { border-color: #10b981; }
+  .paso-num {
+    width: 32px; height: 32px; border-radius: 50%; background: var(--border);
+    color: var(--muted); display: flex; align-items: center; justify-content: center;
+    font-weight: 700; font-size: 0.9rem; margin-bottom: 12px;
+  }
+  .paso.activo .paso-num { background: var(--accent); color: white; }
+  .paso.listo  .paso-num { background: #10b981; color: white; }
+  .paso h3 { font-size: 0.95rem; margin-bottom: 6px; }
+  .paso p  { font-size: 0.82rem; color: var(--muted); margin-bottom: 14px; }
+  .paso .estado { font-size: 0.8rem; font-weight: 600; color: var(--muted); }
+  .paso.listo .estado { color: #10b981; }
+
+  .btn {
+    padding: 8px 16px; border-radius: 7px; font-size: 0.85rem;
+    cursor: pointer; border: none; font-weight: 600; transition: opacity 0.2s;
+  }
+  .btn:hover { opacity: 0.85; }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .btn-primary   { background: var(--accent); color: white; }
+  .btn-secondary { background: white; color: var(--text); border: 1px solid var(--border); }
+  .btn-conciliar { background: #1d4ed8; color: white; font-size: 0.95rem; padding: 11px 28px; }
+  .btn-export    { background: #166534; color: white; }
+
+  input[type="file"] { display: none; }
+
+  /* Selector mes/cuenta */
+  .config-bar {
+    background: var(--surface); border-radius: 10px; padding: 16px 20px;
+    margin-bottom: 24px; display: flex; gap: 16px; align-items: center; flex-wrap: wrap;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+  }
+  .config-bar label { font-size: 0.85rem; color: var(--muted); }
+  .config-bar select, .config-bar input[type="text"] {
+    border: 1px solid var(--border); border-radius: 7px; padding: 8px 12px;
+    font-size: 0.88rem; color: var(--text); background: white; outline: none;
+  }
+  .config-bar select:focus { border-color: var(--accent); }
+
+  /* Resumen tarjetas */
+  .resumen {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 16px; margin-bottom: 28px;
+  }
+  .stat { background: var(--surface); border-radius: 10px; padding: 18px; box-shadow: 0 2px 6px rgba(0,0,0,0.06); }
+  .stat .label { font-size: 0.7rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px; }
+  .stat .value { font-size: 1.25rem; font-weight: 700; }
+  .stat.ok     .value { color: #10b981; }
+  .stat.warn   .value { color: var(--warning); }
+  .stat.err    .value { color: var(--danger); }
+  .stat.info   .value { color: #2563eb; }
+
+  /* Filtros */
+  .filtros {
+    background: var(--surface); border-radius: 10px; padding: 13px 18px;
+    margin-bottom: 16px; display: flex; gap: 12px; flex-wrap: wrap; align-items: center;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.04);
+  }
+  .filtros select, .filtros input[type="text"] {
+    border: 1px solid var(--border); border-radius: 6px; padding: 6px 11px;
+    font-size: 0.84rem; color: var(--text); background: white; outline: none;
+  }
+  .filtros label { font-size: 0.82rem; color: var(--muted); }
+
+  /* Tabla */
+  .tabla-wrap { background: var(--surface); border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.07); overflow: hidden; margin-bottom: 30px; }
+  .tabla-header {
+    padding: 14px 18px; display: flex; justify-content: space-between; align-items: center;
+    border-bottom: 1px solid var(--border); flex-wrap: wrap; gap: 8px;
+  }
+  .tabla-header h3 { font-size: 0.95rem; font-weight: 600; }
+  .tabla-header span { font-size: 0.8rem; color: var(--muted); }
+  .table-scroll { overflow-x: auto; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+  thead th {
+    background: #f8fafc; padding: 10px 12px; text-align: left;
+    font-size: 0.7rem; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.04em; color: var(--muted); border-bottom: 1px solid var(--border); white-space: nowrap;
+  }
+  tbody tr { border-bottom: 1px solid #f1f3f5; transition: background 0.1s; }
+  tbody tr:hover { background: #f8fafb; }
+  tbody td { padding: 9px 12px; vertical-align: middle; }
+
+  .badge {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 3px 9px; border-radius: 20px; font-size: 0.71rem; font-weight: 600; white-space: nowrap;
+  }
+  .badge-ok   { background: #ecfdf5; color: #065f46; }
+  .badge-diff { background: var(--warning-light); color: var(--warning); }
+  .badge-sin  { background: #eff6ff; color: #1d4ed8; }
+  .badge-prog { background: #f5f3ff; color: #6d28d9; }
+
+  .monto-pos { color: #10b981; font-weight: 600; }
+  .monto-neg { color: var(--danger); font-weight: 600; }
+
+  .empty-state { text-align: center; padding: 50px; color: var(--muted); }
+  .empty-state .icon { font-size: 2.5rem; margin-bottom: 10px; }
+
+  .toast {
+    position: fixed; bottom: 24px; right: 24px; background: #1f2937; color: white;
+    padding: 12px 20px; border-radius: 8px; font-size: 0.85rem; z-index: 9999;
+    opacity: 0; transform: translateY(10px); transition: 0.3s; pointer-events: none;
+  }
+  .toast.show { opacity: 1; transform: translateY(0); }
+  .toast.error { background: var(--danger); }
+
+  footer { text-align: center; padding: 24px; color: var(--muted); font-size: 0.8rem; }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>SION Finanzas</h1>
+    <p>Sistema de conciliación y control financiero</p>
+  </div>
+  <a href="index.html">← Volver al panel</a>
+</header>
+
+<div class="container">
+  <h2>Conciliación Bancaria</h2>
+
+  <!-- Config -->
+  <div class="config-bar">
+    <label>Cuenta:</label>
+    <select id="selectCuenta">
+      <option value="BANCOLOMBIA SION">🏦 Banco SION</option>
+      <option value="DAVIPLATA">📱 Daviplata</option>
+      <option value="INDEPENDIENTES">👤 Independientes</option>
+    </select>
+    <label>Mes:</label>
+    <select id="selectMes">
+      <option value="01">Enero</option>
+      <option value="02">Febrero</option>
+      <option value="03">Marzo</option>
+      <option value="04">Abril</option>
+      <option value="05">Mayo</option>
+      <option value="06">Junio</option>
+      <option value="07">Julio</option>
+      <option value="08">Agosto</option>
+      <option value="09">Septiembre</option>
+      <option value="10">Octubre</option>
+      <option value="11">Noviembre</option>
+      <option value="12">Diciembre</option>
+    </select>
+    <label>Año:</label>
+    <select id="selectAnio">
+      <option value="2026">2026</option>
+      <option value="2025">2025</option>
+    </select>
+  </div>
+
+  <!-- Pasos -->
+  <div class="pasos">
+    <div class="paso activo" id="paso1">
+      <div class="paso-num">1</div>
+      <h3>Extracto Bancario</h3>
+      <p>Subí el extracto oficial del banco del mes a conciliar.</p>
+      <button class="btn btn-primary" onclick="document.getElementById('fileBanco').click()">📂 Cargar extracto</button>
+      <input type="file" id="fileBanco" accept=".xlsx,.xls" onchange="cargarBanco(this)">
+      <div class="estado" id="estadoBanco">Sin cargar</div>
+    </div>
+    <div class="paso" id="paso2">
+      <div class="paso-num">2</div>
+      <h3>Ingreso Programa</h3>
+      <p>Subí el archivo del sistema de afiliaciones del mismo mes.</p>
+      <button class="btn btn-primary" onclick="document.getElementById('filePrograma').click()">📂 Cargar programa</button>
+      <input type="file" id="filePrograma" accept=".xlsx,.xls" onchange="cargarPrograma(this)">
+      <div class="estado" id="estadoPrograma">Sin cargar</div>
+    </div>
+    <div class="paso" id="paso3">
+      <div class="paso-num">3</div>
+      <h3>Conciliar</h3>
+      <p>El sistema cruza los datos y muestra las diferencias.</p>
+      <button class="btn btn-conciliar" id="btnConciliar" onclick="conciliar()" disabled>⚡ Ejecutar conciliación</button>
+      <div class="estado" id="estadoConciliacion">Esperando archivos</div>
+    </div>
+  </div>
+
+  <!-- Resumen -->
+  <div class="resumen" id="resumenDiv" style="display:none;">
+    <div class="stat info">
+      <div class="label">Total programa</div>
+      <div class="value" id="rTotalProg">$0</div>
+    </div>
+    <div class="stat info">
+      <div class="label">Total banco (ingresos)</div>
+      <div class="value" id="rTotalBanco">$0</div>
+    </div>
+    <div class="stat ok">
+      <div class="label">✅ Conciliados</div>
+      <div class="value" id="rConciliados">0</div>
+    </div>
+    <div class="stat warn">
+      <div class="label">⚠️ Diferencia valor</div>
+      <div class="value" id="rDiferencia">0</div>
+    </div>
+    <div class="stat err">
+      <div class="label">❌ Sin cruce banco</div>
+      <div class="value" id="rSinBanco">0</div>
+    </div>
+    <div class="stat">
+      <div class="label">🔵 Solo en banco</div>
+      <div class="value" id="rSoloBanco">0</div>
+    </div>
+  </div>
+
+  <!-- Filtros resultado -->
+  <div class="filtros" id="filtrosDiv" style="display:none;">
+    <label>Estado:</label>
+    <select id="filtroEstado" onchange="renderResultado()">
+      <option value="">Todos</option>
+      <option value="ok">✅ Conciliados</option>
+      <option value="diff">⚠️ Diferencia</option>
+      <option value="sin_banco">❌ Sin cruce banco</option>
+      <option value="solo_banco">🔵 Solo en banco</option>
+    </select>
+    <label>Buscar:</label>
+    <input type="text" id="filtroBuscar" placeholder="Afiliado, recibo, planilla..." oninput="renderResultado()">
+    <button class="btn btn-export" onclick="exportarExcel()" style="margin-left:auto;">⬇ Exportar Excel</button>
+  </div>
+
+  <!-- Tabla resultado -->
+  <div class="tabla-wrap" id="tablaWrap" style="display:none;">
+    <div class="tabla-header">
+      <h3 id="tituloTabla">Resultado de conciliación</h3>
+      <span id="contadorTabla"></span>
+    </div>
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Estado</th>
+            <th>Recibo</th>
+            <th>N° Planilla</th>
+            <th>Afiliado</th>
+            <th>Banco Prog.</th>
+            <th>Total Programa</th>
+            <th>Total SS</th>
+            <th>Val. SS OK</th>
+            <th>Fecha Banco</th>
+            <th>Descripción Banco</th>
+            <th>Valor Banco</th>
+            <th>Diferencia</th>
+          </tr>
+        </thead>
+        <tbody id="tablaCuerpo"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<footer>SION ERP • Sistema financiero</footer>
+<div class="toast" id="toast"></div>
+
+<script>
+  let datosBanco    = [];
+  let datosPrograma = [];
+  let resultado     = [];
+
+  // ── Cargar extracto banco ─────────────────────────────────
+  function cargarBanco(input) {
+    const archivo = input.files[0];
+    if (!archivo) return;
+    mostrarToast('⏳ Leyendo extracto...');
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      try {
+        const wb = XLSX.read(new Uint8Array(e.target.result), { type: 'array' });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const rows = XLSX.utils.sheet_to_json(ws, { header: 1, raw: false });
+
+        // Buscar fila de encabezado FECHA
+        let startRow = -1;
+        for (let i = 0; i < rows.length; i++) {
+          if (rows[i] && rows[i][0] && String(rows[i][0]).toUpperCase().includes('FECHA')) {
+            startRow = i + 1; break;
+          }
+        }
+
+        if (startRow === -1) {
+          // Formato alternativo (sucursal virtual) — empieza en fila 0
+          startRow = 0;
+        }
+
+        const anio = document.getElementById('selectAnio').value;
+        datosBanco = [];
+
+        for (let i = startRow; i < rows.length; i++) {
+          const r = rows[i];
+          if (!r || !r[0] || !r[1]) continue;
+
+          let fecha = String(r[0]).trim();
+          // Convertir "5/01" → "05/01/2026"
+          if (fecha.match(/^\d{1,2}\/\d{2}$/)) {
+            const [d, m] = fecha.split('/');
+            fecha = `${d.padStart(2,'0')}/${m}/${anio}`;
+          }
+
+          const desc  = String(r[1] || '').trim();
+          const valor = parsearNumero(r[4] !== undefined ? r[4] : r[6]);
+
+          if (!desc) continue;
+
+          datosBanco.push({ fecha, desc, valor, saldo: r[5] || '' });
+        }
+
+        document.getElementById('estadoBanco').textContent = `✅ ${datosBanco.length} movimientos cargados`;
+        document.getElementById('paso1').className = 'paso listo';
+        document.getElementById('paso2').className = 'paso activo';
+        verificarListoParaConciliar();
+        mostrarToast(`✅ Extracto cargado — ${datosBanco.length} movimientos`);
+      } catch(err) {
+        mostrarToast('Error leyendo el extracto', true);
+        console.error(err);
+      }
+    };
+    reader.readAsArrayBuffer(archivo);
+  }
+
+  // ── Cargar Ingreso Programa ───────────────────────────────
+  function cargarPrograma(input) {
+    const archivo = input.files[0];
+    if (!archivo) return;
+    mostrarToast('⏳ Leyendo Ingreso Programa...');
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      try {
+        const wb = XLSX.read(new Uint8Array(e.target.result), { type: 'array' });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const rows = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true });
+
+        // Buscar fila de encabezados (contiene 'Recibo')
+        let headerRow = 1;
+        for (let i = 0; i < rows.length; i++) {
+          if (rows[i] && rows[i].includes('Recibo')) { headerRow = i; break; }
+        }
+
+        const headers = rows[headerRow];
+        const idx = {
+          recibo:    headers.indexOf('Recibo'),
+          cc:        headers.indexOf('C.C.'),
+          afiliado:  headers.indexOf('Afiliado'),
+          banco:     headers.indexOf('Banco'),
+          total:     headers.indexOf('Total'),
+          totalSS:   headers.indexOf('Total SS'),
+          epsVal:    18, arlVal: 20, afpVal: 22, ccfVal: 24,
+          planilla:  headers.indexOf('No.Planilla'),
+          asesor:    headers.indexOf('Asesor'),
+          detalle:   headers.indexOf('Detalle'),
+          periodo:   headers.indexOf('Periodo'),
+        };
+
+        const cuentaSel = document.getElementById('selectCuenta').value;
+        datosPrograma = [];
+
+        for (let i = headerRow + 1; i < rows.length; i++) {
+          const r = rows[i];
+          if (!r || !r[idx.recibo]) continue;
+
+          const banco = String(r[idx.banco] || '').toUpperCase();
+          // Filtrar por cuenta seleccionada
+          if (!banco.includes(cuentaSel.split(' ')[0]) &&
+              !cuentaSel.includes(banco.split(' ')[0])) continue;
+
+          const epsV = Number(r[idx.epsVal]) || 0;
+          const arlV = Number(r[idx.arlVal]) || 0;
+          const afpV = Number(r[idx.afpVal]) || 0;
+          const ccfV = Number(r[idx.ccfVal]) || 0;
+          const totalSS = Number(r[idx.totalSS]) || 0;
+          const ssOk = Math.abs((epsV + arlV + afpV + ccfV) - totalSS) < 1;
+
+          datosPrograma.push({
+            recibo:   String(r[idx.recibo] || '').trim(),
+            cc:       String(r[idx.cc] || ''),
+            afiliado: String(r[idx.afiliado] || ''),
+            banco:    String(r[idx.banco] || ''),
+            total:    Number(r[idx.total]) || 0,
+            totalSS,
+            ssOk,
+            planilla: r[idx.planilla] ? String(r[idx.planilla]) : '',
+            asesor:   String(r[idx.asesor] || ''),
+            detalle:  String(r[idx.detalle] || ''),
+          });
+        }
+
+        document.getElementById('estadoPrograma').textContent = `✅ ${datosPrograma.length} registros cargados`;
+        document.getElementById('paso2').className = 'paso listo';
+        document.getElementById('paso3').className = 'paso activo';
+        verificarListoParaConciliar();
+        mostrarToast(`✅ Programa cargado — ${datosPrograma.length} registros para ${cuentaSel}`);
+      } catch(err) {
+        mostrarToast('Error leyendo Ingreso Programa', true);
+        console.error(err);
+      }
+    };
+    reader.readAsArrayBuffer(archivo);
+  }
+
+  function verificarListoParaConciliar() {
+    const listo = datosBanco.length > 0 && datosPrograma.length > 0;
+    document.getElementById('btnConciliar').disabled = !listo;
+    if (listo) document.getElementById('estadoConciliacion').textContent = '¡Listo para conciliar!';
+  }
+
+  // ── Conciliar ─────────────────────────────────────────────
+  function conciliar() {
+    mostrarToast('⏳ Conciliando...');
+    resultado = [];
+
+    // Índice de movimientos banco por valor (para cruce)
+    const bancoUsado = new Set();
+
+    // Por cada registro del programa, buscar en banco
+    for (const prog of datosPrograma) {
+      // Buscar en banco por valor exacto (ingreso positivo)
+      let matchIdx = -1;
+      let matchDiff = false;
+
+      // Buscar valor exacto
+      for (let i = 0; i < datosBanco.length; i++) {
+        if (bancoUsado.has(i)) continue;
+        if (datosBanco[i].valor > 0 && Math.abs(datosBanco[i].valor - prog.total) < 1) {
+          matchIdx = i; break;
+        }
+      }
+
+      // Si no hay exacto, buscar diferencia < 5%
+      if (matchIdx === -1) {
+        for (let i = 0; i < datosBanco.length; i++) {
+          if (bancoUsado.has(i)) continue;
+          if (datosBanco[i].valor > 0) {
+            const diff = Math.abs(datosBanco[i].valor - prog.total);
+            const pct  = diff / prog.total;
+            if (pct < 0.05) { matchIdx = i; matchDiff = true; break; }
+          }
+        }
+      }
+
+      if (matchIdx !== -1) {
+        bancoUsado.add(matchIdx);
+        const mov = datosBanco[matchIdx];
+        const diff = mov.valor - prog.total;
+        resultado.push({
+          estado:    Math.abs(diff) < 1 ? 'ok' : 'diff',
+          recibo:    prog.recibo,
+          planilla:  prog.planilla,
+          afiliado:  prog.afiliado,
+          bancoProg: prog.banco,
+          totalProg: prog.total,
+          totalSS:   prog.totalSS,
+          ssOk:      prog.ssOk,
+          fechaBanco:mov.fecha,
+          descBanco: mov.desc,
+          valorBanco:mov.valor,
+          diferencia:diff,
+        });
+      } else {
+        // Sin cruce en banco
+        resultado.push({
+          estado:    'sin_banco',
+          recibo:    prog.recibo,
+          planilla:  prog.planilla,
+          afiliado:  prog.afiliado,
+          bancoProg: prog.banco,
+          totalProg: prog.total,
+          totalSS:   prog.totalSS,
+          ssOk:      prog.ssOk,
+          fechaBanco:'—',
+          descBanco: '—',
+          valorBanco:0,
+          diferencia: -prog.total,
+        });
+      }
+    }
+
+    // Movimientos del banco sin cruce en programa
+    for (let i = 0; i < datosBanco.length; i++) {
+      if (bancoUsado.has(i)) continue;
+      if (datosBanco[i].valor <= 0) continue; // ignorar egresos
+      resultado.push({
+        estado:    'solo_banco',
+        recibo:    '—',
+        planilla:  '—',
+        afiliado:  '—',
+        bancoProg: '—',
+        totalProg: 0,
+        totalSS:   0,
+        ssOk:      null,
+        fechaBanco:datosBanco[i].fecha,
+        descBanco: datosBanco[i].desc,
+        valorBanco:datosBanco[i].valor,
+        diferencia:datosBanco[i].valor,
+      });
+    }
+
+    // Actualizar resumen
+    const cuenta = document.getElementById('selectCuenta').value;
+    const mes    = document.getElementById('selectMes').value;
+    const anio   = document.getElementById('selectAnio').value;
+    const meses  = ['','Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+
+    document.getElementById('tituloTabla').textContent =
+      `Conciliación ${cuenta} — ${meses[parseInt(mes)]} ${anio}`;
+
+    const totalProg  = datosPrograma.reduce((s,p) => s+p.total, 0);
+    const totalBanco = datosBanco.filter(m=>m.valor>0).reduce((s,m) => s+m.valor, 0);
+    const nOk   = resultado.filter(r=>r.estado==='ok').length;
+    const nDiff = resultado.filter(r=>r.estado==='diff').length;
+    const nSinB = resultado.filter(r=>r.estado==='sin_banco').length;
+    const nSolB = resultado.filter(r=>r.estado==='solo_banco').length;
+
+    document.getElementById('rTotalProg').textContent   = formatCOP(totalProg);
+    document.getElementById('rTotalBanco').textContent  = formatCOP(totalBanco);
+    document.getElementById('rConciliados').textContent = nOk;
+    document.getElementById('rDiferencia').textContent  = nDiff;
+    document.getElementById('rSinBanco').textContent    = nSinB;
+    document.getElementById('rSoloBanco').textContent   = nSolB;
+
+    document.getElementById('resumenDiv').style.display  = 'grid';
+    document.getElementById('filtrosDiv').style.display  = 'flex';
+    document.getElementById('tablaWrap').style.display   = 'block';
+    document.getElementById('paso3').className = 'paso listo';
+    document.getElementById('estadoConciliacion').textContent = `✅ ${resultado.length} registros procesados`;
+
+    renderResultado();
+    mostrarToast(`✅ Conciliación completa — ${nOk} conciliados, ${nDiff+nSinB} con diferencias`);
+  }
+
+  // ── Render tabla resultado ────────────────────────────────
+  function renderResultado() {
+    const filtroE = document.getElementById('filtroEstado').value;
+    const buscar  = document.getElementById('filtroBuscar').value.toLowerCase();
+
+    const filtrados = resultado.filter(r => {
+      const matchE = !filtroE || r.estado === filtroE;
+      const matchB = !buscar  ||
+        r.afiliado.toLowerCase().includes(buscar) ||
+        r.recibo.toLowerCase().includes(buscar)   ||
+        r.planilla.toLowerCase().includes(buscar) ||
+        r.descBanco.toLowerCase().includes(buscar);
+      return matchE && matchB;
+    });
+
+    document.getElementById('contadorTabla').textContent =
+      `${filtrados.length} de ${resultado.length} registros`;
+
+    const tbody = document.getElementById('tablaCuerpo');
+    if (filtrados.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="13"><div class="empty-state"><div class="icon">🔍</div><p>Sin resultados</p></div></td></tr>`;
+      return;
+    }
+
+    const badgeMap = {
+      ok:        '<span class="badge badge-ok">✅ Conciliado</span>',
+      diff:      '<span class="badge badge-diff">⚠️ Diferencia</span>',
+      sin_banco: '<span class="badge badge-sin">❌ Sin cruce</span>',
+      solo_banco:'<span class="badge badge-prog">🔵 Solo banco</span>',
+    };
+
+    tbody.innerHTML = filtrados.map((r,i) => `
+      <tr>
+        <td style="color:var(--muted);font-size:0.75rem;">${i+1}</td>
+        <td>${badgeMap[r.estado]}</td>
+        <td style="font-size:0.78rem;">${r.recibo}</td>
+        <td style="font-size:0.78rem;">${r.planilla}</td>
+        <td>${r.afiliado}</td>
+        <td style="font-size:0.78rem;color:var(--muted);">${r.bancoProg}</td>
+        <td class="monto-pos">${r.totalProg ? formatCOP(r.totalProg) : '—'}</td>
+        <td style="font-size:0.78rem;">${r.totalSS ? formatCOP(r.totalSS) : '—'}</td>
+        <td style="text-align:center;">${r.ssOk === null ? '—' : r.ssOk ? '✅' : '❌'}</td>
+        <td style="white-space:nowrap;">${r.fechaBanco}</td>
+        <td style="font-size:0.78rem;">${r.descBanco}</td>
+        <td class="${r.valorBanco >= 0 ? 'monto-pos':'monto-neg'}">${r.valorBanco ? formatCOP(r.valorBanco) : '—'}</td>
+        <td class="${Math.abs(r.diferencia) < 1 ? '' : r.diferencia > 0 ? 'monto-pos':'monto-neg'}">
+          ${Math.abs(r.diferencia) < 1 ? '—' : formatCOP(r.diferencia)}
+        </td>
+      </tr>
+    `).join('');
+  }
+
+  // ── Exportar ──────────────────────────────────────────────
+  function exportarExcel() {
+    const data = resultado.map(r => ({
+      Estado: { ok:'Conciliado', diff:'Diferencia', sin_banco:'Sin cruce banco', solo_banco:'Solo en banco' }[r.estado],
+      Recibo: r.recibo, 'N° Planilla': r.planilla, Afiliado: r.afiliado,
+      'Banco Programa': r.bancoProg,
+      'Total Programa': r.totalProg, 'Total SS': r.totalSS,
+      'SS Válido': r.ssOk === null ? '' : r.ssOk ? 'Sí' : 'No',
+      'Fecha Banco': r.fechaBanco, 'Descripción Banco': r.descBanco,
+      'Valor Banco': r.valorBanco, 'Diferencia': r.diferencia
+    }));
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Conciliación');
+    const mes  = document.getElementById('selectMes').value;
+    const anio = document.getElementById('selectAnio').value;
+    XLSX.writeFile(wb, `Conciliacion_${anio}_${mes}.xlsx`);
+  }
+
+  // ── Helpers ───────────────────────────────────────────────
+  function parsearNumero(v) {
+    if (v === undefined || v === null || v === '') return 0;
+    const str = String(v).trim();
+    const neg = str.startsWith('-') || str.includes('(');
+    const clean = str.replace(/[^0-9.]/g, '');
+    // Si tiene coma como decimal colombiano
+    const cleanCO = str.replace(/[^0-9,]/g,'').replace(',','.');
+    let num = parseFloat(clean) || parseFloat(cleanCO) || 0;
+    return neg ? -num : num;
+  }
+  function formatCOP(n) {
+    return new Intl.NumberFormat('es-CO',{style:'currency',currency:'COP',minimumFractionDigits:0,maximumFractionDigits:0}).format(Math.abs(n));
+  }
+  function mostrarToast(msg, error=false) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.className = 'toast show' + (error?' error':'');
+    setTimeout(()=>t.className='toast', 3500);
+  }
+</script>
+</body>
+</html>
