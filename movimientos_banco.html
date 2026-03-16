@@ -653,8 +653,16 @@
   }
   function formatFecha(v) {
     if (!v) return '';
-    if (typeof v === 'string' && v.includes('-')) { const [y,m,d] = v.split('-'); return `${d}/${m}/${y}`; }
-    return String(v);
+    const s = String(v).trim();
+    // Ya viene en formato correcto dd-mmm-aa
+    if (s.match(/^\d{2}-[a-z]{3}-\d{2}$/i)) return s;
+    // Formato yyyy-mm-dd
+    if (s.match(/^\d{4}-\d{2}-\d{2}/)) {
+      const [y,m,d] = s.split('-');
+      const meses = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+      return d + '-' + meses[parseInt(m)-1] + '-' + y.slice(2);
+    }
+    return s;
   }
   function formatCOP(n) {
     return new Intl.NumberFormat('es-CO',{style:'currency',currency:'COP',minimumFractionDigits:0,maximumFractionDigits:0}).format(n);
