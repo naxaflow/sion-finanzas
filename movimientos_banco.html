@@ -262,7 +262,7 @@
     <p id="modalMsg"></p>
     <ul class="modal-list" id="modalLista"></ul>
     <div class="modal-actions">
-      <button class="btn btn-secondary" onclick="cerrarModal()">Cancelar</button>
+      <button class="btn btn-secondary" onclick="cancelarImportacion()">Cancelar</button>
       <button class="btn btn-primary" id="btnImportar" onclick="confirmarImport()">Importar solo nuevos</button>
     </div>
   </div>
@@ -471,15 +471,25 @@
     document.getElementById('modalDups').classList.add('show');
   }
 
-  function cerrarModal() { document.getElementById('modalDups').classList.remove('show'); pendientesImport = []; }
+  function cerrarModal() {
+    document.getElementById('modalDups').classList.remove('show');
+  }
+  function limpiarPendientesImport() {
+    pendientesImport = [];
+  }
+  function cancelarImportacion() {
+    cerrarModal();
+    limpiarPendientesImport();
+  }
 
   async function confirmarImport() {
     if (pendientesImport.length === 0) return;
+    const registrosAImportar = [...pendientesImport];
     cerrarModal();
     mostrarToast('⏳ Guardando...');
     const lote = 50;
-    for (let i = 0; i < pendientesImport.length; i += lote) {
-      const bloque = pendientesImport.slice(i, i + lote);
+    for (let i = 0; i < registrosAImportar.length; i += lote) {
+      const bloque = registrosAImportar.slice(i, i + lote);
       const { error } = await sb.from('movimientos').insert(bloque);
       if (error) {
         mostrarToast('Error guardando movimientos: ' + error.message, true);
@@ -487,7 +497,8 @@
         return;
       }
     }
-    mostrarToast(`✅ ${pendientesImport.length} movimientos importados`);
+    limpiarPendientesImport();
+    mostrarToast(`✅ ${registrosAImportar.length} movimientos importados`);
     hint.style.display = 'none';
     cargarMovimientos();
   }
