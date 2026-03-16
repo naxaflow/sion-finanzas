@@ -320,3 +320,23 @@ cargarMovimientos()
 
 </body>
 </html>
+async function borrarTodos() {
+
+  const cuenta = document.getElementById('selectCuenta').value;
+
+  if (!confirm("Eliminar TODOS los movimientos de esta cuenta?")) return;
+
+  const { error } = await sb
+    .from('movimientos')
+    .delete()
+    .eq('cuenta', cuenta);
+
+  if (error) {
+    alert("Error eliminando movimientos");
+    console.error(error);
+    return;
+  }
+
+  alert("Todos los movimientos eliminados");
+  cargarMovimientos();
+}
