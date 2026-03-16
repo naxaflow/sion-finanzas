@@ -160,7 +160,26 @@
       <option value="Daviplata">📱 Daviplata</option>
       <option value="Independientes">👤 Independientes</option>
     </select>
-    <button class="btn btn-secondary" onclick="document.getElementById('excelFile').click()">📂 Cargar Excel</button>
+    <select id="selectMes" onchange="cargarMovimientos()">
+      <option value="">-- Seleccioná mes --</option>
+      <option value="01">Enero</option>
+      <option value="02">Febrero</option>
+      <option value="03">Marzo</option>
+      <option value="04">Abril</option>
+      <option value="05">Mayo</option>
+      <option value="06">Junio</option>
+      <option value="07">Julio</option>
+      <option value="08">Agosto</option>
+      <option value="09">Septiembre</option>
+      <option value="10">Octubre</option>
+      <option value="11">Noviembre</option>
+      <option value="12">Diciembre</option>
+    </select>
+    <select id="selectAnio" onchange="cargarMovimientos()">
+      <option value="2026">2026</option>
+      <option value="2025">2025</option>
+    </select>
+    <button class="btn btn-secondary" onclick="abrirExcel()">📂 Cargar Excel</button>
     <input type="file" id="excelFile" accept=".xlsx,.xls" style="display:none">
     <button class="btn btn-primary" onclick="agregarManual()">+ Agregar movimiento</button>
     <button class="btn btn-excel" onclick="exportarExcel()">⬇ Exportar Excel</button>
@@ -297,16 +316,45 @@
 
   cargarMovimientos();
 
+  function abrirExcel() {
+    const mes = document.getElementById('selectMes').value;
+    if (!mes) {
+      mostrarToast('⚠️ Seleccioná un mes antes de cargar el Excel', true);
+      return;
+    }
+    document.getElementById('excelFile').click();
+  }
+
   // ── Cargar movimientos desde Supabase ─────────────────────
   async function cargarMovimientos() {
     const cuenta = document.getElementById('selectCuenta').value;
-    document.getElementById('tituloTabla').textContent = cuenta;
+    const mes    = document.getElementById('selectMes').value;
+    const anio   = document.getElementById('selectAnio').value;
+
+    const MESES_NOMBRE = ['','Enero','Febrero','Marzo','Abril','Mayo','Junio',
+                          'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+    document.getElementById('tituloTabla').textContent =
+      mes ? `${cuenta} — ${MESES_NOMBRE[parseInt(mes)]} ${anio}` : cuenta;
+
+    if (!mes) {
+      document.getElementById('tablaCuerpo').innerHTML =
+        `<tr><td colspan="11"><div class="empty-state"><div class="icon">📅</div><p>Seleccioná un mes para ver los movimientos</p></div></td></tr>`;
+      movimientos = [];
+      actualizarResumen();
+      return;
+    }
+
     document.getElementById('tablaCuerpo').innerHTML =
       `<tr><td colspan="11"><div class="empty-state"><div class="icon">⏳</div><p>Cargando...</p></div></td></tr>`;
+
+    const fechaDesde = `${anio}-${mes}-01`;
+    const fechaHasta = `${anio}-${mes}-31`;
 
     const { data, error } = await sb
       .from('movimientos').select('*')
       .eq('cuenta', cuenta)
+      .gte('fecha_orden', fechaDesde)
+      .lte('fecha_orden', fechaHasta)
       .order('fecha_orden', { ascending: true });
 
     if (error) { mostrarToast('Error: ' + error.message, true); return; }
@@ -487,6 +535,8 @@
     const cuenta = document.getElementById('selectCuenta').value;
     const hoy = new Date();
     const fecha = `${String(hoy.getDate()).padStart(2,'0')}-${['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'][hoy.getMonth()]}-${String(hoy.getFullYear()).slice(2)}`;
+    const mes  = document.getElementById('selectMes').value;
+    if (!mes) { mostrarToast('⚠️ Seleccioná un mes primero', true); return; }
     const { data, error } = await sb.from('movimientos').insert([{
       fecha, canal: 'Manual', descripcion: '', referencia: '',
       monto: 0, tipo: 'credito', recibo: '', concepto: '', numero_planilla: '',
