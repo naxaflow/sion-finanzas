@@ -307,7 +307,7 @@
     const { data, error } = await sb
       .from('movimientos').select('*')
       .eq('cuenta', cuenta)
-      .order('fecha_orden', { ascending: false });
+      .order('fecha_orden', { ascending: true });
 
     if (error) { mostrarToast('Error: ' + error.message, true); return; }
     movimientos = data || [];
