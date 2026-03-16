@@ -411,15 +411,20 @@
 
         if (delExcel.length === 0) { mostrarToast('Sin movimientos en el archivo', true); return; }
 
-        const claveExistente = new Set(
-          movimientos.map(m => `${m.fecha}|${(m.descripcion||'').toLowerCase()}|${Number(m.monto)}`)
+        // Duplicados solo aplican para recibos — movimientos sin recibo siempre se importan
+        const recibosExistentes = new Set(
+          movimientos.filter(m => m.recibo && m.recibo.trim() !== '').map(m => m.recibo.trim())
         );
 
         const nuevos = [], duplicados = [];
         for (const reg of delExcel) {
-          const clave = `${reg.fecha}|${reg.descripcion.toLowerCase()}|${Number(reg.monto)}`;
-          if (claveExistente.has(clave)) { duplicados.push(reg); }
-          else { nuevos.push(reg); claveExistente.add(clave); }
+          const recibo = (reg.recibo || '').trim();
+          if (recibo && recibosExistentes.has(recibo)) {
+            duplicados.push(reg);
+          } else {
+            nuevos.push(reg);
+            if (recibo) recibosExistentes.add(recibo);
+          }
         }
 
         pendientesImport = nuevos;
@@ -431,27 +436,28 @@
     reader.readAsArrayBuffer(archivo);
   }
 
-  // ── Modal duplicados ──────────────────────────────────────
+  // ── Modal confirmación ───────────────────────────────────
   function mostrarModal(nuevos, duplicados) {
-    if (duplicados.length === 0 && nuevos.length === 0) {
-      mostrarToast('No hay registros nuevos', true); return;
+    if (nuevos.length === 0) {
+      mostrarToast('No hay movimientos para importar', true); return;
     }
     const lista = document.getElementById('modalLista');
     document.getElementById('modalMsg').textContent =
-      `${nuevos.length} registros nuevos y ${duplicados.length} duplicados.`;
+      `${nuevos.length} movimientos listos para importar.`;
     lista.innerHTML = '';
-    nuevos.forEach(r => {
+    nuevos.slice(0, 10).forEach(r => {
       const li = document.createElement('li');
-      li.textContent = `✅ ${r.fecha} | ${r.descripcion} | ${formatCOP(r.monto)}`;
+      li.textContent = `${r.fecha} | ${r.descripcion} | ${formatCOP(r.monto)}`;
       lista.appendChild(li);
     });
-    duplicados.forEach(r => {
-      const li = document.createElement('li'); li.className = 'dup';
-      li.textContent = `🔁 ${r.fecha} | ${r.descripcion} | ${formatCOP(r.monto)}`;
+    if (nuevos.length > 10) {
+      const li = document.createElement('li');
+      li.textContent = `... y ${nuevos.length - 10} más`;
+      li.style.color = 'var(--muted)';
       lista.appendChild(li);
-    });
-    document.getElementById('btnImportar').textContent = nuevos.length > 0 ? `Importar ${nuevos.length} nuevos` : 'Sin nuevos';
-    document.getElementById('btnImportar').disabled = nuevos.length === 0;
+    }
+    document.getElementById('btnImportar').textContent = `Importar ${nuevos.length} movimientos`;
+    document.getElementById('btnImportar').disabled = false;
     document.getElementById('modalDups').classList.add('show');
   }
 
