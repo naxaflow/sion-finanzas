@@ -196,17 +196,21 @@
       <div class="label">Movimientos</div>
       <div class="value" id="statTotal">0</div>
     </div>
+    <div class="stat">
+      <div class="label">Saldo inicial</div>
+      <div class="value" id="statSaldoInicial">$0,00</div>
+    </div>
     <div class="stat credit">
       <div class="label">Total ingresos</div>
-      <div class="value" id="statCreditos">$0</div>
+      <div class="value" id="statCreditos">$0,00</div>
     </div>
     <div class="stat debit">
       <div class="label">Total egresos</div>
-      <div class="value" id="statDebitos">$0</div>
+      <div class="value" id="statDebitos">$0,00</div>
     </div>
     <div class="stat">
-      <div class="label">Saldo neto</div>
-      <div class="value" id="statNeto">$0</div>
+      <div class="label">Saldo final</div>
+      <div class="value" id="statNeto">$0,00</div>
     </div>
   </div>
 
@@ -360,12 +364,58 @@
     if (error) { mostrarToast('Error: ' + error.message, true); return; }
     movimientos = data || [];
 
+    // Cargar saldo inicial del mes anterior
+    await cargarSaldoInicial(cuenta, mes, anio);
+
     const recibosConDatos = movimientos.filter(m => m.recibo).map(m => m.recibo);
     if (recibosConDatos.length > 0) await cargarCachePrograma(recibosConDatos);
 
     actualizarResumen();
     renderTabla();
     if (movimientos.length > 0) hint.style.display = 'none';
+  }
+
+  async function cargarSaldoInicial(cuenta, mes, anio) {
+    if (!mes) { saldoInicialMes = 0; return; }
+
+    // Calcular mes anterior
+    let mesPrev = parseInt(mes) - 1;
+    let anioPrev = parseInt(anio);
+    if (mesPrev === 0) { mesPrev = 12; anioPrev--; }
+    const mesPrevStr  = String(mesPrev).padStart(2,'0');
+    const anioPrevStr = String(anioPrev);
+
+    // Buscar saldo inicial guardado para el mes anterior
+    const { data: saldoDB } = await sb
+      .from('saldos_iniciales')
+      .select('saldo')
+      .eq('cuenta', cuenta)
+      .eq('anio', anioPrevStr)
+      .eq('mes', mesPrevStr)
+      .single();
+
+    if (saldoDB) {
+      // Saldo inicial guardado + movimientos del mes anterior
+      const { data: movsPrev } = await sb
+        .from('movimientos')
+        .select('monto, tipo')
+        .eq('cuenta', cuenta)
+        .gte('fecha_orden', `${anioPrevStr}-${mesPrevStr}-01`)
+        .lte('fecha_orden', `${anioPrevStr}-${mesPrevStr}-31`);
+
+      const netoPrev = (movsPrev || []).reduce((s,m) => s + Number(m.monto), 0);
+      saldoInicialMes = Number(saldoDB.saldo) + netoPrev;
+    } else {
+      // Buscar directamente si hay saldo inicial para este mes
+      const { data: saldoEste } = await sb
+        .from('saldos_iniciales')
+        .select('saldo')
+        .eq('cuenta', cuenta)
+        .eq('anio', anio)
+        .eq('mes', mes)
+        .single();
+      saldoInicialMes = saldoEste ? Number(saldoEste.saldo) : 0;
+    }
   }
 
   // ── Cache Ingreso Programa ────────────────────────────────
@@ -651,15 +701,19 @@
   }
 
   // ── Resumen ───────────────────────────────────────────────
+  let saldoInicialMes = 0;
+
   function actualizarResumen() {
     const creds = movimientos.filter(m=>m.tipo==='credito').reduce((s,m)=>s+Number(m.monto),0);
     const debs  = movimientos.filter(m=>m.tipo==='debito' ).reduce((s,m)=>s+Number(m.monto),0);
-    const neto  = creds + debs;
-    document.getElementById('statTotal').textContent    = movimientos.length;
-    document.getElementById('statCreditos').textContent = formatCOP(creds);
-    document.getElementById('statDebitos').textContent  = formatCOP(Math.abs(debs));
-    document.getElementById('statNeto').textContent     = formatCOP(neto);
-    document.getElementById('statNeto').style.color     = neto>=0?'var(--credit)':'var(--debit)';
+    const saldoFinal = saldoInicialMes + creds + debs;
+
+    document.getElementById('statTotal').textContent         = movimientos.length;
+    document.getElementById('statSaldoInicial').textContent  = formatCOP2(saldoInicialMes);
+    document.getElementById('statCreditos').textContent      = formatCOP2(creds);
+    document.getElementById('statDebitos').textContent       = formatCOP2(Math.abs(debs));
+    document.getElementById('statNeto').textContent          = formatCOP2(saldoFinal);
+    document.getElementById('statNeto').style.color          = saldoFinal>=0?'var(--credit)':'var(--debit)';
   }
 
   // ── Exportar Excel ────────────────────────────────────────
@@ -711,6 +765,9 @@
     return neg ? -(parseFloat(clean)||0) : (parseFloat(clean)||0);
   }
 
+  function formatCOP2(n) {
+    return new Intl.NumberFormat('es-CO',{style:'currency',currency:'COP',minimumFractionDigits:2,maximumFractionDigits:2}).format(n||0);
+  }
   function formatCOP(n) {
     return new Intl.NumberFormat('es-CO',{style:'currency',currency:'COP',minimumFractionDigits:0,maximumFractionDigits:0}).format(Math.abs(n||0));
   }
