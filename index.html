@@ -6,20 +6,13 @@
 <title>SION Finanzas</title>
 <style>
   :root {
-    --bg: #f0f2f5;
-    --surface: #ffffff;
-    --header-bg: #0f2937;
-    --accent: #1e8a5e;
-    --text: #1f2937;
-    --muted: #6b7280;
-    --border: #e5e7eb;
+    --bg: #f0f2f5; --surface: #ffffff; --header-bg: #0f2937;
+    --accent: #1e8a5e; --text: #1f2937; --muted: #6b7280; --border: #e5e7eb;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: 'Segoe UI', Arial, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
 
-  header {
-    background: var(--header-bg); color: white; padding: 25px 30px;
-  }
+  header { background: var(--header-bg); color: white; padding: 25px 30px; }
   header h1 { font-size: 1.6rem; font-weight: 700; }
   header p  { font-size: 0.88rem; opacity: 0.7; margin-top: 4px; }
 
@@ -33,31 +26,17 @@
   }
 
   .card {
-    background: var(--surface);
-    padding: 28px;
-    border-radius: 12px;
-    box-shadow: 0 3px 10px rgba(0,0,0,0.08);
-    cursor: pointer;
-    transition: transform 0.2s, box-shadow 0.2s;
-    border: 2px solid transparent;
-    text-decoration: none;
-    color: var(--text);
-    display: block;
+    background: var(--surface); padding: 28px; border-radius: 12px;
+    box-shadow: 0 3px 10px rgba(0,0,0,0.08); cursor: pointer;
+    transition: transform 0.2s, box-shadow 0.2s; border: 2px solid transparent;
+    text-decoration: none; color: var(--text); display: block;
   }
   .card:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+    transform: translateY(-4px); box-shadow: 0 8px 24px rgba(0,0,0,0.12);
     border-color: var(--accent);
   }
-  .card.disabled {
-    cursor: default;
-    opacity: 0.6;
-  }
-  .card.disabled:hover {
-    transform: none;
-    box-shadow: 0 3px 10px rgba(0,0,0,0.08);
-    border-color: transparent;
-  }
+  .card.disabled { cursor: default; opacity: 0.6; }
+  .card.disabled:hover { transform: none; box-shadow: 0 3px 10px rgba(0,0,0,0.08); border-color: transparent; }
 
   .card-icon { font-size: 2rem; margin-bottom: 14px; }
   .card h3   { font-size: 1rem; font-weight: 700; margin-bottom: 6px; }
@@ -88,10 +67,10 @@
   <h2>Panel Principal — seleccioná un módulo</h2>
   <div class="cards">
 
-    <a class="card" href="pagos.html">
-      <div class="card-icon">💳</div>
-      <h3>Pagos del Programa</h3>
-      <p>Cargá y validá los pagos registrados en el sistema de afiliaciones.</p>
+    <a class="card" href="ingreso_programa.html">
+      <div class="card-icon">📋</div>
+      <h3>Ingreso Programa</h3>
+      <p>Cargá el archivo del sistema de afiliaciones. Base de datos central del sistema.</p>
       <span class="badge-activo">✅ Activo</span>
     </a>
 
@@ -109,6 +88,13 @@
       <span class="badge-activo">✅ Activo</span>
     </a>
 
+    <a class="card" href="pagos.html">
+      <div class="card-icon">💳</div>
+      <h3>Pagos del Programa</h3>
+      <p>Validá los pagos registrados en el sistema de afiliaciones.</p>
+      <span class="badge-activo">✅ Activo</span>
+    </a>
+
     <div class="card disabled">
       <div class="card-icon">📒</div>
       <h3>Movimientos Contables</h3>
@@ -123,12 +109,12 @@
       <span class="badge-pronto">Próximamente</span>
     </div>
 
-    <a class="card disabled">
+    <div class="card disabled">
       <div class="card-icon">📊</div>
       <h3>Reportes</h3>
       <p>Análisis financiero mensual y flujo de dinero por cuenta.</p>
       <span class="badge-pronto">Próximamente</span>
-    </a>
+    </div>
 
   </div>
 </div>
