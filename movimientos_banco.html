@@ -479,12 +479,14 @@
         for (let i = 0; i < rows.length; i++) {
           const r = rows[i];
           if (!r || r.length < 7) continue;
-	  
-         const canal       = r[1] ? String(r[1]).trim() : 'Bancolombia';
-	 const fecha       = r[3] ? String(r[3]).trim() : '';
-	 const descripcion = r[7] ? String(r[7]).trim() : '';
-	 const referencia  = r[6] ? String(r[6]).trim() : '';
-	 const monto       = parsearMonto(r[5]);
+
+          const fecha       = r[0] ? String(r[0]).trim() : '';
+          const canal       = r[1] ? String(r[1]).trim() : 'Bancolombia';
+          const descripcion = r[2] ? String(r[2]).trim() : '';
+          const ref1        = r[3] && String(r[3]).trim() !== '- -' ? String(r[3]).trim() : '';
+          const ref2        = r[4] && String(r[4]).trim() !== '- -' ? String(r[4]).trim() : '';
+          const referencia  = [ref1, ref2].filter(Boolean).join(' / ');
+          const monto       = parsearMonto(r[6]);
 
           if (!fecha || fecha.toUpperCase() === 'FECHA') continue;
           if (!descripcion) continue;
