@@ -382,7 +382,7 @@
     mostrarToast(`✓ ${prog.afiliado} — $${Number(prog.total).toLocaleString('es-CO')}`);
   }
 
-  // ── Procesar Excel con anti-duplicados ────────────────────
+  // ── Procesar Excel ───────────────────────────────────────
   async function procesarExcel(archivo) {
     mostrarToast('⏳ Analizando archivo...');
     const reader = new FileReader();
@@ -396,50 +396,60 @@
         const delExcel = [];
         for (let i = 0; i < rows.length; i++) {
           const r = rows[i];
-          if (!r || r.length < 3) continue;
-          const monto = parsearMonto(r[6]);
-          if (monto === 0 && !r[2]) continue;
-          const ref1 = r[3] && r[3] !== '- -' ? String(r[3]) : '';
-          const ref2 = r[4] && r[4] !== '- -' && String(r[4]) !== ref1 ? String(r[4]) : '';
+          if (!r || r.length < 7) continue;
+
+          const fecha       = r[0] ? String(r[0]).trim() : '';
+          const canal       = r[1] ? String(r[1]).trim() : 'Bancolombia';
+          const descripcion = r[2] ? String(r[2]).trim() : '';
+          const ref1        = r[3] && String(r[3]).trim() !== '- -' ? String(r[3]).trim() : '';
+          const ref2        = r[4] && String(r[4]).trim() !== '- -' ? String(r[4]).trim() : '';
+          const referencia  = [ref1, ref2].filter(Boolean).join(' / ');
+          const monto       = parsearMonto(r[6]);
+
+          // Saltar encabezados y filas inválidas
+          if (!fecha || fecha.toUpperCase() === 'FECHA') continue;
+          if (!descripcion) continue;
+          if (monto === 0) continue;
+
           delExcel.push({
-            fecha: formatFecha(r[0]), canal: String(r[1]||''),
-            descripcion: String(r[2]||''), referencia: [ref1,ref2].filter(Boolean).join(' / '),
-            monto, tipo: monto >= 0 ? 'credito' : 'debito',
+            fecha, canal, descripcion, referencia, monto,
+            tipo: monto >= 0 ? 'credito' : 'debito',
             recibo: '', concepto: '', numero_planilla: '', cuenta
           });
         }
 
-        if (delExcel.length === 0) { mostrarToast('Sin movimientos en el archivo', true); return; }
+        if (delExcel.length === 0) {
+          mostrarToast('Sin movimientos válidos en el archivo', true); return;
+        }
 
-        // Duplicados solo aplican para recibos — movimientos sin recibo siempre se importan
-        const recibosExistentes = new Set(
-          movimientos.filter(m => m.recibo && m.recibo.trim() !== '').map(m => m.recibo.trim())
+        // Duplicados: comparar por fecha + descripcion + monto + cuenta
+        const clavesExistentes = new Set(
+          movimientos.map(m => `${m.fecha}|${(m.descripcion||'').toLowerCase()}|${Number(m.monto)}|${m.cuenta}`)
         );
 
-        const nuevos = [], duplicados = [];
+        const nuevos = [];
         for (const reg of delExcel) {
-          const recibo = (reg.recibo || '').trim();
-          if (recibo && recibosExistentes.has(recibo)) {
-            duplicados.push(reg);
-          } else {
+          const clave = `${reg.fecha}|${reg.descripcion.toLowerCase()}|${Number(reg.monto)}|${reg.cuenta}`;
+          if (!clavesExistentes.has(clave)) {
             nuevos.push(reg);
-            if (recibo) recibosExistentes.add(recibo);
+            clavesExistentes.add(clave);
           }
         }
 
         pendientesImport = nuevos;
-        mostrarModal(nuevos, duplicados);
+        mostrarModal(nuevos);
       } catch(err) {
-        mostrarToast('Error procesando archivo', true); console.error(err);
+        mostrarToast('Error procesando archivo: ' + err.message, true);
+        console.error(err);
       }
     };
     reader.readAsArrayBuffer(archivo);
   }
 
   // ── Modal confirmación ───────────────────────────────────
-  function mostrarModal(nuevos, duplicados) {
+  function mostrarModal(nuevos) {
     if (nuevos.length === 0) {
-      mostrarToast('No hay movimientos para importar', true); return;
+      mostrarToast('No hay movimientos nuevos para importar', true); return;
     }
     const lista = document.getElementById('modalLista');
     document.getElementById('modalMsg').textContent =
@@ -469,8 +479,13 @@
     mostrarToast('⏳ Guardando...');
     const lote = 50;
     for (let i = 0; i < pendientesImport.length; i += lote) {
-      const { error } = await sb.from('movimientos').insert(pendientesImport.slice(i, i + lote));
-      if (error) { mostrarToast('Error: ' + error.message, true); return; }
+      const bloque = pendientesImport.slice(i, i + lote);
+      const { error } = await sb.from('movimientos').insert(bloque);
+      if (error) {
+        mostrarToast('Error guardando movimientos: ' + error.message, true);
+        console.error(error);
+        return;
+      }
     }
     mostrarToast(`✅ ${pendientesImport.length} movimientos importados`);
     hint.style.display = 'none';
