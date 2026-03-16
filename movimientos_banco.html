@@ -307,7 +307,7 @@
     const { data, error } = await sb
       .from('movimientos').select('*')
       .eq('cuenta', cuenta)
-      .order('created_at', { ascending: false });
+      .order('fecha_orden', { ascending: false });
 
     if (error) { mostrarToast('Error: ' + error.message, true); return; }
     movimientos = data || [];
@@ -389,7 +389,9 @@
           delExcel.push({
             fecha, canal, descripcion, referencia, monto,
             tipo: monto >= 0 ? 'credito' : 'debito',
-            recibo: '', concepto: '', numero_planilla: '', cuenta
+            recibo: '', concepto: '', numero_planilla: '',
+            fecha_orden: parsearFechaOrden(fecha),
+            cuenta
           });
         }
 
@@ -487,7 +489,9 @@
     const fecha = `${String(hoy.getDate()).padStart(2,'0')}-${['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'][hoy.getMonth()]}-${String(hoy.getFullYear()).slice(2)}`;
     const { data, error } = await sb.from('movimientos').insert([{
       fecha, canal: 'Manual', descripcion: '', referencia: '',
-      monto: 0, tipo: 'credito', recibo: '', concepto: '', numero_planilla: '', cuenta
+      monto: 0, tipo: 'credito', recibo: '', concepto: '', numero_planilla: '',
+      fecha_orden: parsearFechaOrden(fecha),
+      cuenta
     }]).select();
     if (error) { mostrarToast('Error: ' + error.message, true); return; }
     movimientos.unshift(data[0]);
@@ -624,6 +628,16 @@
   }
 
   // ── Helpers ───────────────────────────────────────────────
+  function parsearFechaOrden(fecha) {
+    // Convierte "01-ene-26" a "2026-01-01" para ordenar correctamente
+    if (!fecha) return null;
+    const MESES = {ene:'01',feb:'02',mar:'03',abr:'04',may:'05',jun:'06',
+                   jul:'07',ago:'08',sep:'09',oct:'10',nov:'11',dic:'12'};
+    const m = String(fecha).toLowerCase().match(/^(\d{2})-([a-z]{3})-(\d{2})$/);
+    if (m) return `20${m[3]}-${MESES[m[2]] || '01'}-${m[1]}`;
+    return null;
+  }
+
   function parsearMonto(texto) {
     if (!texto || String(texto).trim() === '- -' || String(texto).trim() === '') return 0;
     const str = String(texto).replace(/\u00a0/g, '').replace(/\s/g, '');
