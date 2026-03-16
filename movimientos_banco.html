@@ -624,8 +624,16 @@
   // ── Helpers ───────────────────────────────────────────────
   function parsearMonto(texto) {
     if (!texto || texto === '- -') return 0;
-    const str = String(texto); const neg = str.includes('-');
-    const clean = str.replace(/[^0-9,]/g,'').replace(/\./g,'').replace(',','.');
+    const str = String(texto).replace(/\u00a0/g,'').replace(/\s/g,'');
+    const neg = str.includes('-');
+    let clean;
+    if (str.includes('.') && str.includes(',')) {
+      clean = str.replace(/[^0-9,]/g,'').replace(',','.');
+    } else if (str.includes(',')) {
+      clean = str.replace(/[^0-9,]/g,'').replace(',','.');
+    } else {
+      clean = str.replace(/[^0-9.]/g,'');
+    }
     return neg ? -(parseFloat(clean)||0) : (parseFloat(clean)||0);
   }
   function parsearMontoManual(v) {
