@@ -466,8 +466,12 @@
   async function confirmarImport() {
     if (pendientesImport.length === 0) return;
     cerrarModal();
-    const { error } = await sb.from('movimientos').insert(pendientesImport);
-    if (error) { mostrarToast('Error: ' + error.message, true); return; }
+    mostrarToast('⏳ Guardando...');
+    const lote = 50;
+    for (let i = 0; i < pendientesImport.length; i += lote) {
+      const { error } = await sb.from('movimientos').insert(pendientesImport.slice(i, i + lote));
+      if (error) { mostrarToast('Error: ' + error.message, true); return; }
+    }
     mostrarToast(`✅ ${pendientesImport.length} movimientos importados`);
     hint.style.display = 'none';
     cargarMovimientos();
