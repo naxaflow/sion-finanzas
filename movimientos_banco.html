@@ -615,20 +615,20 @@
   // ── Agregar manual ────────────────────────────────────────
   async function agregarManual() {
     const cuenta = document.getElementById('selectCuenta').value;
-    const hoy = new Date();
-    const fecha = `${String(hoy.getDate()).padStart(2,'0')}-${['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'][hoy.getMonth()]}-${String(hoy.getFullYear()).slice(2)}`;
-    const mes  = document.getElementById('selectMes').value;
+    const mes    = document.getElementById('selectMes').value;
+    const anio   = document.getElementById('selectAnio').value;
     if (!mes) { mostrarToast('⚠️ Seleccioná un mes primero', true); return; }
+    const MESES = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+    const fecha = `01-${MESES[parseInt(mes)-1]}-${anio.slice(2)}`;
+    const fecha_orden = `${anio}-${mes}-01`;
     const { data, error } = await sb.from('movimientos').insert([{
       fecha, canal: 'Manual', descripcion: '', referencia: '',
       monto: 0, tipo: 'credito', recibo: '', concepto: '', numero_planilla: '',
-      fecha_orden: parsearFechaOrden(fecha),
-      cuenta
+      fecha_orden, cuenta
     }]).select();
     if (error) { mostrarToast('Error: ' + error.message, true); return; }
-    movimientos.unshift(data[0]);
     hint.style.display = 'none';
-    actualizarResumen(); renderTabla();
+    await cargarMovimientos();
   }
 
   // ── Guardar campo ─────────────────────────────────────────
@@ -647,8 +647,8 @@
     if (error) { mostrarToast('Error guardando', true); return; }
     const idx = movimientos.findIndex(m => m.id === id);
     if (idx !== -1) Object.assign(movimientos[idx], update);
-    if (campo === 'monto') { actualizarResumen(); renderTabla(); }
-    else { actualizarResumen(); mostrarToast('✓ Guardado'); }
+    actualizarResumen();
+    if (campo !== 'monto') mostrarToast('✓ Guardado');
   }
 
   async function onReciboBlur(id, valor) {
