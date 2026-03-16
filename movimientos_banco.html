@@ -352,7 +352,8 @@
       `<tr><td colspan="11"><div class="empty-state"><div class="icon">⏳</div><p>Cargando...</p></div></td></tr>`;
 
     const fechaDesde = `${anio}-${mes}-01`;
-    const fechaHasta = `${anio}-${mes}-31`;
+    const ultimoDiaMes = new Date(parseInt(anio), parseInt(mes), 0).getDate();
+    const fechaHasta = `${anio}-${mes}-${String(ultimoDiaMes).padStart(2,'0')}`;
 
     const { data, error } = await sb
       .from('movimientos').select('*')
@@ -410,7 +411,9 @@
     const mesAnterior = parseInt(mes) - 1;
     const anioAnterior = mesAnterior === 0 ? String(parseInt(anio) - 1) : anio;
     const mesAnteriorStr = mesAnterior === 0 ? '12' : String(mesAnterior).padStart(2,'0');
-    const fechaHasta = `${anioAnterior}-${mesAnteriorStr}-31`;
+    // Usar el último día real del mes anterior
+    const ultimoDia = new Date(parseInt(anioAnterior), parseInt(mesAnteriorStr), 0).getDate();
+    const fechaHasta = `${anioAnterior}-${mesAnteriorStr}-${String(ultimoDia).padStart(2,'0')}`;
 
     const { data: movsAnt } = await sb
       .from('movimientos')
