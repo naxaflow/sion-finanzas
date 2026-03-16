@@ -51,7 +51,6 @@
   .upload-zone h3 { font-size: 0.95rem; margin-bottom: 4px; }
   .upload-zone p  { font-size: 0.8rem; color: var(--muted); }
 
-  /* Modal duplicados */
   .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center; }
   .modal-overlay.show { display: flex; }
   .modal { background: white; border-radius: 12px; padding: 28px; max-width: 600px; width: 90%; max-height: 80vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,0.3); }
@@ -59,7 +58,6 @@
   .modal p  { font-size: 0.85rem; color: var(--muted); margin-bottom: 16px; }
   .modal-list { list-style: none; margin-bottom: 20px; }
   .modal-list li { padding: 7px 12px; border-radius: 6px; background: #f8fafc; margin-bottom: 5px; font-size: 0.81rem; border-left: 3px solid var(--accent); }
-  .modal-list li.dup { border-left-color: var(--danger); background: var(--danger-light); }
   .modal-actions { display: flex; gap: 10px; justify-content: flex-end; }
 
   .resumen {
@@ -103,13 +101,9 @@
   tbody tr:hover { background: #f8fafb; }
   tbody td { padding: 7px 10px; vertical-align: middle; }
 
-  .monto-credito { color: var(--credit); font-weight: 600; }
-  .monto-debito  { color: var(--debit);  font-weight: 600; }
-
   .badge { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 0.7rem; font-weight: 600; }
   .badge-credito { background: var(--accent-light); color: var(--credit); }
   .badge-debito  { background: var(--danger-light);  color: var(--debit); }
-  .badge-match   { background: #eff6ff; color: #2563eb; font-size: 0.68rem; }
 
   .input-tabla {
     border: 1px solid transparent; border-radius: 5px; padding: 3px 6px;
@@ -119,12 +113,10 @@
   .input-tabla:focus { border-color: var(--accent); outline: none; background: white; }
   select.input-tabla { cursor: pointer; }
 
-  /* Campo recibo con autocompletado */
   .recibo-wrap { position: relative; min-width: 120px; }
   .recibo-wrap .autocomplete-hint {
     position: absolute; right: 6px; top: 50%; transform: translateY(-50%);
-    font-size: 0.65rem; color: var(--accent); font-weight: 600; pointer-events: none;
-    display: none;
+    font-size: 0.65rem; color: var(--accent); font-weight: 600; pointer-events: none; display: none;
   }
   .recibo-wrap.matched .autocomplete-hint { display: block; }
   .recibo-wrap.matched .input-tabla { border-color: var(--accent); background: #f0fdf4; }
@@ -177,7 +169,7 @@
   <div class="upload-zone" id="uploadHint" onclick="document.getElementById('excelFile').click()">
     <div class="icon">📂</div>
     <h3>Arrastrá el extracto bancario aquí o hacé clic para seleccionar</h3>
-    <p>Formato .xlsx exportado desde la sucursal virtual — detecta duplicados automáticamente</p>
+    <p>Formato .xlsx exportado desde la sucursal virtual</p>
   </div>
 
   <div class="resumen">
@@ -255,15 +247,15 @@
   </div>
 </div>
 
-<!-- Modal duplicados -->
+<!-- Modal -->
 <div class="modal-overlay" id="modalDups">
   <div class="modal">
-    <h3>⚠️ Registros detectados</h3>
+    <h3>📋 Movimientos detectados</h3>
     <p id="modalMsg"></p>
     <ul class="modal-list" id="modalLista"></ul>
     <div class="modal-actions">
       <button class="btn btn-secondary" onclick="cancelarImportacion()">Cancelar</button>
-      <button class="btn btn-primary" id="btnImportar" onclick="confirmarImport()">Importar solo nuevos</button>
+      <button class="btn btn-primary" id="btnImportar" onclick="confirmarImport()">Importar</button>
     </div>
   </div>
 </div>
@@ -284,9 +276,9 @@
     'Otros gastos', 'Otros ingresos', 'Planillas Pagadas'
   ];
 
-  let movimientos    = [];
+  let movimientos = [];
   let pendientesImport = [];
-  let cachePrograma  = {}; // recibo -> datos del programa
+  let cachePrograma = {};
 
   // ── Init ─────────────────────────────────────────────────
   document.getElementById('excelFile').addEventListener('change', e => {
@@ -312,15 +304,13 @@
       `<tr><td colspan="11"><div class="empty-state"><div class="icon">⏳</div><p>Cargando...</p></div></td></tr>`;
 
     const { data, error } = await sb
-      .from('movimientos')
-      .select('*')
+      .from('movimientos').select('*')
       .eq('cuenta', cuenta)
       .order('created_at', { ascending: false });
 
     if (error) { mostrarToast('Error: ' + error.message, true); return; }
     movimientos = data || [];
 
-    // Precargar cache del programa para los recibos que ya tienen
     const recibosConDatos = movimientos.filter(m => m.recibo).map(m => m.recibo);
     if (recibosConDatos.length > 0) await cargarCachePrograma(recibosConDatos);
 
@@ -333,58 +323,43 @@
   async function cargarCachePrograma(recibos) {
     const faltantes = recibos.filter(r => r && !cachePrograma[r]);
     if (faltantes.length === 0) return;
-
-    const { data } = await sb
-      .from('ingreso_programa')
+    const { data } = await sb.from('ingreso_programa')
       .select('recibo, afiliado, banco, total, planilla')
       .in('recibo', faltantes);
-
-    if (data) {
-      data.forEach(r => { cachePrograma[r.recibo] = r; });
-    }
+    if (data) data.forEach(r => { cachePrograma[r.recibo] = r; });
   }
 
   // ── Buscar recibo en Ingreso Programa ─────────────────────
   async function buscarRecibo(id, recibo) {
     if (!recibo || recibo.trim() === '') return;
-
-    // Buscar en cache primero
     if (!cachePrograma[recibo]) {
-      const { data } = await sb
-        .from('ingreso_programa')
+      const { data } = await sb.from('ingreso_programa')
         .select('recibo, afiliado, banco, total, planilla')
-        .eq('recibo', recibo.trim())
-        .single();
-
+        .eq('recibo', recibo.trim()).single();
       if (data) cachePrograma[recibo] = data;
     }
-
     const prog = cachePrograma[recibo];
-    if (!prog) return; // no encontrado, no hacer nada
+    if (!prog) return;
 
-    // Autocompletar planilla si está vacía
     const mov = movimientos.find(m => m.id === id);
     if (mov && (!mov.numero_planilla || mov.numero_planilla === '') && prog.planilla) {
       await guardarCampo(id, 'numero_planilla', prog.planilla);
-      // Actualizar UI
       const inputPlanilla = document.querySelector(`input[data-planilla="${id}"]`);
       if (inputPlanilla) inputPlanilla.value = prog.planilla;
     }
 
-    // Marcar campo recibo como matched
     const wrap = document.querySelector(`div[data-recibo-wrap="${id}"]`);
     if (wrap) {
       wrap.classList.add('matched');
-      const hint = wrap.querySelector('.autocomplete-hint');
-      if (hint) hint.textContent = `✓ ${prog.afiliado}`;
+      const h = wrap.querySelector('.autocomplete-hint');
+      if (h) h.textContent = `✓ ${prog.afiliado}`;
     }
-
-    mostrarToast(`✓ ${prog.afiliado} — $${Number(prog.total).toLocaleString('es-CO')}`);
+    mostrarToast(`✓ ${prog.afiliado} — ${formatCOP(prog.total)}`);
   }
 
-  // ── Procesar Excel ───────────────────────────────────────
+  // ── Procesar Excel ────────────────────────────────────────
   async function procesarExcel(archivo) {
-    mostrarToast('⏳ Analizando archivo...');
+    mostrarToast('⏳ Leyendo archivo...');
     const reader = new FileReader();
     reader.onload = async function(e) {
       try {
@@ -406,7 +381,6 @@
           const referencia  = [ref1, ref2].filter(Boolean).join(' / ');
           const monto       = parsearMonto(r[6]);
 
-          // Saltar encabezados y filas inválidas
           if (!fecha || fecha.toUpperCase() === 'FECHA') continue;
           if (!descripcion) continue;
           if (monto === 0) continue;
@@ -422,7 +396,7 @@
           mostrarToast('Sin movimientos válidos en el archivo', true); return;
         }
 
-        // Duplicados: comparar por fecha + descripcion + monto + cuenta
+        // Duplicados por fecha + descripcion + monto + cuenta
         const clavesExistentes = new Set(
           movimientos.map(m => `${m.fecha}|${(m.descripcion||'').toLowerCase()}|${Number(m.monto)}|${m.cuenta}`)
         );
@@ -437,7 +411,8 @@
         }
 
         pendientesImport = nuevos;
-        mostrarModal(nuevos);
+        mostrarModal();
+
       } catch(err) {
         mostrarToast('Error procesando archivo: ' + err.message, true);
         console.error(err);
@@ -446,37 +421,38 @@
     reader.readAsArrayBuffer(archivo);
   }
 
-  // ── Modal confirmación ───────────────────────────────────
-  function mostrarModal(nuevos) {
-    if (nuevos.length === 0) {
+  // ── Modal ─────────────────────────────────────────────────
+  function mostrarModal() {
+    if (pendientesImport.length === 0) {
       mostrarToast('No hay movimientos nuevos para importar', true); return;
     }
     const lista = document.getElementById('modalLista');
     document.getElementById('modalMsg').textContent =
-      `${nuevos.length} movimientos listos para importar.`;
+      `${pendientesImport.length} movimientos listos para importar.`;
     lista.innerHTML = '';
-    nuevos.slice(0, 10).forEach(r => {
+    pendientesImport.slice(0, 10).forEach(r => {
       const li = document.createElement('li');
       li.textContent = `${r.fecha} | ${r.descripcion} | ${formatCOP(r.monto)}`;
       lista.appendChild(li);
     });
-    if (nuevos.length > 10) {
+    if (pendientesImport.length > 10) {
       const li = document.createElement('li');
-      li.textContent = `... y ${nuevos.length - 10} más`;
+      li.textContent = `... y ${pendientesImport.length - 10} más`;
       li.style.color = 'var(--muted)';
       lista.appendChild(li);
     }
-    document.getElementById('btnImportar').textContent = `Importar ${nuevos.length} movimientos`;
-    document.getElementById('btnImportar').disabled = false;
+    document.getElementById('btnImportar').textContent = `Importar ${pendientesImport.length} movimientos`;
     document.getElementById('modalDups').classList.add('show');
   }
 
   function cerrarModal() {
     document.getElementById('modalDups').classList.remove('show');
   }
+
   function limpiarPendientesImport() {
     pendientesImport = [];
   }
+
   function cancelarImportacion() {
     cerrarModal();
     limpiarPendientesImport();
@@ -507,7 +483,7 @@
   async function agregarManual() {
     const cuenta = document.getElementById('selectCuenta').value;
     const hoy = new Date();
-    const fecha = `${String(hoy.getDate()).padStart(2,'0')}/${String(hoy.getMonth()+1).padStart(2,'0')}/${hoy.getFullYear()}`;
+    const fecha = `${String(hoy.getDate()).padStart(2,'0')}-${['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'][hoy.getMonth()]}-${String(hoy.getFullYear()).slice(2)}`;
     const { data, error } = await sb.from('movimientos').insert([{
       fecha, canal: 'Manual', descripcion: '', referencia: '',
       monto: 0, tipo: 'credito', recibo: '', concepto: '', numero_planilla: '', cuenta
@@ -533,7 +509,6 @@
     else actualizarResumen();
   }
 
-  // ── Al terminar de escribir recibo ────────────────────────
   async function onReciboBlur(id, valor) {
     await guardarCampo(id, 'recibo', valor);
     if (valor.trim()) await buscarRecibo(id, valor.trim());
@@ -583,20 +558,16 @@
       return `
       <tr>
         <td style="color:var(--muted);font-size:0.75rem;">${i+1}</td>
-        <td>
-          <input class="input-tabla" value="${esc(m.fecha)}" style="width:88px;"
-            onblur="guardarCampo('${m.id}','fecha',this.value)">
-        </td>
+        <td><input class="input-tabla" value="${esc(m.fecha)}" style="width:88px;"
+            onblur="guardarCampo('${m.id}','fecha',this.value)"></td>
         <td style="color:var(--muted);font-size:0.78rem;">${esc(m.canal)}</td>
         <td>
           <input class="input-tabla" value="${esc(m.descripcion)}" style="min-width:140px;"
             onblur="guardarCampo('${m.id}','descripcion',this.value)">
           ${tieneMatch ? `<div style="font-size:0.7rem;color:var(--accent);margin-top:2px;">👤 ${prog.afiliado}</div>` : ''}
         </td>
-        <td>
-          <input class="input-tabla" value="${esc(m.referencia)}" style="min-width:90px;"
-            onblur="guardarCampo('${m.id}','referencia',this.value)">
-        </td>
+        <td><input class="input-tabla" value="${esc(m.referencia)}" style="min-width:90px;"
+            onblur="guardarCampo('${m.id}','referencia',this.value)"></td>
         <td><span class="badge badge-${m.tipo}">${m.tipo==='credito'?'Ingreso':'Egreso'}</span></td>
         <td>
           <input class="input-tabla" value="${formatMontoRaw(m.monto)}"
@@ -607,25 +578,19 @@
         <td>
           <div class="recibo-wrap ${tieneMatch?'matched':''}" data-recibo-wrap="${m.id}">
             <input class="input-tabla" value="${esc(m.recibo)}" placeholder="CI-000000..."
-              style="min-width:110px;"
-              onblur="onReciboBlur('${m.id}',this.value)">
+              style="min-width:110px;" onblur="onReciboBlur('${m.id}',this.value)">
             <span class="autocomplete-hint">${tieneMatch ? '✓ '+prog.afiliado.split(' ')[0] : ''}</span>
           </div>
         </td>
-        <td>
-          <input class="input-tabla" value="${esc(m.numero_planilla)}" placeholder="N° planilla..."
-            data-planilla="${m.id}"
-            style="min-width:100px;"
-            onblur="guardarCampo('${m.id}','numero_planilla',this.value)">
-        </td>
+        <td><input class="input-tabla" value="${esc(m.numero_planilla)}" placeholder="N° planilla..."
+            data-planilla="${m.id}" style="min-width:100px;"
+            onblur="guardarCampo('${m.id}','numero_planilla',this.value)"></td>
         <td>
           <select class="input-tabla" onchange="guardarCampo('${m.id}','concepto',this.value)">
             ${CONCEPTOS.map(c=>`<option ${c===m.concepto?'selected':''}>${c}</option>`).join('')}
           </select>
         </td>
-        <td>
-          <button class="btn-del" onclick="eliminar('${m.id}')" title="Eliminar">🗑</button>
-        </td>
+        <td><button class="btn-del" onclick="eliminar('${m.id}')" title="Eliminar">🗑</button></td>
       </tr>`;
     }).join('');
   }
@@ -659,46 +624,44 @@
 
   // ── Helpers ───────────────────────────────────────────────
   function parsearMonto(texto) {
-    if (!texto || texto === '- -') return 0;
-    const str = String(texto).replace(/\u00a0/g,'').replace(/\s/g,'');
+    if (!texto || String(texto).trim() === '- -' || String(texto).trim() === '') return 0;
+    const str = String(texto).replace(/\u00a0/g, '').replace(/\s/g, '');
     const neg = str.includes('-');
     let clean;
     if (str.includes('.') && str.includes(',')) {
-      clean = str.replace(/[^0-9,]/g,'').replace(',','.');
+      clean = str.replace(/[^0-9,]/g, '').replace(',', '.');
     } else if (str.includes(',')) {
-      clean = str.replace(/[^0-9,]/g,'').replace(',','.');
+      clean = str.replace(/[^0-9,]/g, '').replace(',', '.');
     } else {
-      clean = str.replace(/[^0-9.]/g,'');
+      clean = str.replace(/[^0-9.]/g, '');
     }
-    return neg ? -(parseFloat(clean)||0) : (parseFloat(clean)||0);
+    const num = parseFloat(clean) || 0;
+    return neg ? -num : num;
   }
+
   function parsearMontoManual(v) {
-    const str = String(v).trim(); const neg = str.startsWith('-');
+    const str = String(v).trim();
+    const neg = str.startsWith('-');
     const clean = str.replace(/[^0-9,]/g,'').replace(/\./g,'').replace(',','.');
     return neg ? -(parseFloat(clean)||0) : (parseFloat(clean)||0);
   }
-  function formatFecha(v) {
-    if (!v) return '';
-    const s = String(v).trim();
-    // Ya viene en formato correcto dd-mmm-aa
-    if (s.match(/^\d{2}-[a-z]{3}-\d{2}$/i)) return s;
-    // Formato yyyy-mm-dd
-    if (s.match(/^\d{4}-\d{2}-\d{2}/)) {
-      const [y,m,d] = s.split('-');
-      const meses = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
-      return d + '-' + meses[parseInt(m)-1] + '-' + y.slice(2);
-    }
-    return s;
-  }
+
   function formatCOP(n) {
-    return new Intl.NumberFormat('es-CO',{style:'currency',currency:'COP',minimumFractionDigits:0,maximumFractionDigits:0}).format(n);
+    return new Intl.NumberFormat('es-CO',{style:'currency',currency:'COP',minimumFractionDigits:0,maximumFractionDigits:0}).format(Math.abs(n||0));
   }
-  function formatMontoRaw(n) { const num = Number(n); return (num < 0 ? '-' : '') + Math.abs(num).toLocaleString('es-CO'); }
+
+  function formatMontoRaw(n) {
+    const num = Number(n);
+    return (num < 0 ? '-' : '') + Math.abs(num).toLocaleString('es-CO');
+  }
+
   function esc(s) { return (s||'').replace(/"/g,'&quot;').replace(/</g,'&lt;'); }
+
   function mostrarToast(msg, error=false) {
     const t = document.getElementById('toast');
-    t.textContent = msg; t.className = 'toast show'+(error?' error':'');
-    setTimeout(()=>t.className='toast', 3500);
+    t.textContent = msg;
+    t.className = 'toast show' + (error ? ' error' : '');
+    setTimeout(() => t.className = 'toast', 3500);
   }
 </script>
 </body>
