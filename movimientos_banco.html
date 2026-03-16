@@ -563,8 +563,8 @@
         </td>
         <td><span class="badge badge-${m.tipo}">${m.tipo==='credito'?'Ingreso':'Egreso'}</span></td>
         <td>
-          <input class="input-tabla monto-${m.tipo}" value="${formatMontoRaw(m.monto)}"
-            style="width:105px;text-align:right;"
+          <input class="input-tabla" value="${formatMontoRaw(m.monto)}"
+            style="width:105px;text-align:right;color:${m.tipo==='debito'?'var(--debit)':'var(--credit)'};font-weight:600;"
             onblur="guardarCampo('${m.id}','monto',this.value)">
           ${tieneMatch ? `<div style="font-size:0.68rem;color:var(--muted);">Prog: ${formatMontoRaw(prog.total)}</div>` : ''}
         </td>
