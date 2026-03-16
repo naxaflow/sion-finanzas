@@ -377,45 +377,50 @@
 
   async function cargarSaldoInicial(cuenta, mes, anio) {
     if (!mes) { saldoInicialMes = 0; return; }
+    saldoInicialMes = 0;
 
-    // Calcular mes anterior
-    let mesPrev = parseInt(mes) - 1;
-    let anioPrev = parseInt(anio);
-    if (mesPrev === 0) { mesPrev = 12; anioPrev--; }
-    const mesPrevStr  = String(mesPrev).padStart(2,'0');
-    const anioPrevStr = String(anioPrev);
-
-    // Buscar saldo inicial guardado para el mes anterior
-    const { data: saldoDB } = await sb
+    // Estrategia: sumar saldo base + todos los movimientos anteriores al mes actual
+    // 1. Buscar el saldo base más reciente anterior o igual al mes actual
+    const { data: saldos } = await sb
       .from('saldos_iniciales')
-      .select('saldo')
+      .select('cuenta, anio, mes, saldo')
       .eq('cuenta', cuenta)
-      .eq('anio', anioPrevStr)
-      .eq('mes', mesPrevStr)
-      .single();
+      .order('anio', { ascending: true })
+      .order('mes', { ascending: true });
 
-    if (saldoDB) {
-      // Saldo inicial guardado + movimientos del mes anterior
-      const { data: movsPrev } = await sb
-        .from('movimientos')
-        .select('monto, tipo')
-        .eq('cuenta', cuenta)
-        .gte('fecha_orden', `${anioPrevStr}-${mesPrevStr}-01`)
-        .lte('fecha_orden', `${anioPrevStr}-${mesPrevStr}-31`);
+    if (!saldos || saldos.length === 0) { saldoInicialMes = 0; return; }
 
-      const netoPrev = (movsPrev || []).reduce((s,m) => s + Number(m.monto), 0);
-      saldoInicialMes = Number(saldoDB.saldo) + netoPrev;
-    } else {
-      // Buscar directamente si hay saldo inicial para este mes
-      const { data: saldoEste } = await sb
-        .from('saldos_iniciales')
-        .select('saldo')
-        .eq('cuenta', cuenta)
-        .eq('anio', anio)
-        .eq('mes', mes)
-        .single();
-      saldoInicialMes = saldoEste ? Number(saldoEste.saldo) : 0;
+    // Tomar el saldo base más reciente anterior al mes actual
+    const fechaActual = `${anio}${mes}`;
+    let saldoBase = null;
+    let saldoBaseFecha = null;
+
+    for (const s of saldos) {
+      const fechaS = `${s.anio}${s.mes}`;
+      if (fechaS < fechaActual) {
+        saldoBase = Number(s.saldo);
+        saldoBaseFecha = { anio: s.anio, mes: s.mes };
+      }
     }
+
+    if (saldoBase === null) { saldoInicialMes = 0; return; }
+
+    // 2. Sumar todos los movimientos desde el mes siguiente al saldo base hasta el mes anterior al actual
+    const fechaDesde = `${saldoBaseFecha.anio}-${saldoBaseFecha.mes}-01`;
+    const mesAnterior = parseInt(mes) - 1;
+    const anioAnterior = mesAnterior === 0 ? String(parseInt(anio) - 1) : anio;
+    const mesAnteriorStr = mesAnterior === 0 ? '12' : String(mesAnterior).padStart(2,'0');
+    const fechaHasta = `${anioAnterior}-${mesAnteriorStr}-31`;
+
+    const { data: movsAnt } = await sb
+      .from('movimientos')
+      .select('monto')
+      .eq('cuenta', cuenta)
+      .gte('fecha_orden', fechaDesde)
+      .lte('fecha_orden', fechaHasta);
+
+    const neto = (movsAnt || []).reduce((s, m) => s + Number(m.monto), 0);
+    saldoInicialMes = saldoBase + neto;
   }
 
   // ── Cache Ingreso Programa ────────────────────────────────
