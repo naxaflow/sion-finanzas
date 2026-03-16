@@ -214,6 +214,18 @@
     </div>
   </div>
 
+  <!-- Verificación saldo real -->
+  <div class="filtros" style="background:#fff8e1;border:1px solid #fcd34d;">
+    <label style="color:#92400e;font-weight:600;">💰 Saldo real banco:</label>
+    <input type="text" id="saldoReal" placeholder="Ej: 29.247.462,65"
+      style="width:160px;font-weight:600;"
+      oninput="calcularDiferencia()">
+    <label style="color:#92400e;font-weight:600;">Saldo calculado:</label>
+    <span id="saldoCalculado" style="font-weight:700;color:#1e8a5e;">$0,00</span>
+    <label style="color:#92400e;font-weight:600;">Diferencia:</label>
+    <span id="diferenciaSaldo" style="font-weight:700;font-size:1rem;">—</span>
+  </div>
+
   <div class="filtros">
     <label>Tipo:</label>
     <select id="filtroTipo" onchange="renderTabla()">
@@ -744,17 +756,31 @@
   // ── Resumen ───────────────────────────────────────────────
   let saldoInicialMes = 0;
 
+  let saldoFinalCalculado = 0;
+
   function actualizarResumen() {
     const creds = movimientos.filter(m=>m.tipo==='credito').reduce((s,m)=>s+Number(m.monto),0);
     const debs  = movimientos.filter(m=>m.tipo==='debito' ).reduce((s,m)=>s+Number(m.monto),0);
-    const saldoFinal = saldoInicialMes + creds + debs;
+    saldoFinalCalculado = saldoInicialMes + creds + debs;
 
     document.getElementById('statTotal').textContent         = movimientos.length;
     document.getElementById('statSaldoInicial').textContent  = formatCOP2(saldoInicialMes);
     document.getElementById('statCreditos').textContent      = formatCOP2(creds);
     document.getElementById('statDebitos').textContent       = formatCOP2(Math.abs(debs));
-    document.getElementById('statNeto').textContent          = formatCOP2(saldoFinal);
-    document.getElementById('statNeto').style.color          = saldoFinal>=0?'var(--credit)':'var(--debit)';
+    document.getElementById('statNeto').textContent          = formatCOP2(saldoFinalCalculado);
+    document.getElementById('statNeto').style.color          = saldoFinalCalculado>=0?'var(--credit)':'var(--debit)';
+    document.getElementById('saldoCalculado').textContent    = formatCOP2(saldoFinalCalculado);
+    calcularDiferencia();
+  }
+
+  function calcularDiferencia() {
+    const input = document.getElementById('saldoReal').value;
+    const span  = document.getElementById('diferenciaSaldo');
+    if (!input.trim()) { span.textContent = '—'; span.style.color = '#6b7280'; return; }
+    const saldoReal = parsearMontoManual(input);
+    const diff = saldoReal - saldoFinalCalculado;
+    span.textContent = (diff >= 0 ? '+' : '') + formatCOP2(diff);
+    span.style.color = Math.abs(diff) < 1 ? '#1e8a5e' : '#dc2626';
   }
 
   // ── Exportar Excel ────────────────────────────────────────
