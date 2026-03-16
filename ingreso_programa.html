@@ -1,1 +1,619 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ingreso Programa – SION Finanzas</title>
+<script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root {
+    --bg: #f0f2f5; --surface: #fff; --header-bg: #0f2937;
+    --accent: #1e8a5e; --accent-light: #e6f5ef;
+    --danger: #dc2626; --danger-light: #fef2f2;
+    --warning: #d97706; --warning-light: #fffbeb;
+    --text: #1f2937; --muted: #6b7280; --border: #e5e7eb;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', Arial, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+  header {
+    background: var(--header-bg); color: white; padding: 20px 30px;
+    display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;
+  }
+  header h1 { font-size: 1.4rem; font-weight: 700; }
+  header p  { font-size: 0.85rem; opacity: 0.7; margin-top: 2px; }
+  header a  { color: #93c5fd; text-decoration: none; font-size: 0.85rem; }
+
+  .container { padding: 30px; max-width: 1200px; margin: 0 auto; }
+  h2 { font-size: 1.15rem; margin-bottom: 24px; }
+
+  .config-bar {
+    background: var(--surface); border-radius: 10px; padding: 16px 20px;
+    margin-bottom: 24px; display: flex; gap: 16px; align-items: center; flex-wrap: wrap;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+  }
+  .config-bar label { font-size: 0.85rem; color: var(--muted); }
+  .config-bar select {
+    border: 1px solid var(--border); border-radius: 7px; padding: 8px 12px;
+    font-size: 0.88rem; color: var(--text); background: white; outline: none;
+  }
+
+  .upload-zone {
+    background: var(--surface); border: 2px dashed var(--border); border-radius: 12px;
+    padding: 40px; text-align: center; cursor: pointer; transition: 0.2s; margin-bottom: 24px;
+  }
+  .upload-zone:hover { border-color: var(--accent); background: var(--accent-light); }
+  .upload-zone .icon { font-size: 2.5rem; margin-bottom: 10px; }
+  .upload-zone h3 { font-size: 1rem; margin-bottom: 6px; }
+  .upload-zone p { font-size: 0.82rem; color: var(--muted); }
+  input[type="file"] { display: none; }
+
+  .btn {
+    padding: 9px 20px; border-radius: 8px; font-size: 0.88rem;
+    cursor: pointer; border: none; font-weight: 600; transition: opacity 0.2s;
+  }
+  .btn:hover { opacity: 0.85; }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .btn-primary   { background: var(--accent); color: white; }
+  .btn-secondary { background: white; color: var(--text); border: 1px solid var(--border); }
+  .btn-danger    { background: var(--danger); color: white; }
+
+  /* Resumen */
+  .resumen {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+    gap: 16px; margin-bottom: 24px;
+  }
+  .stat { background: var(--surface); border-radius: 10px; padding: 18px; box-shadow: 0 2px 6px rgba(0,0,0,0.06); }
+  .stat .label { font-size: 0.72rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px; }
+  .stat .value { font-size: 1.3rem; font-weight: 700; }
+  .stat.ok   .value { color: var(--accent); }
+  .stat.dup  .value { color: var(--warning); }
+  .stat.info .value { color: #2563eb; }
+
+  /* Modal */
+  .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center; }
+  .modal-overlay.show { display: flex; }
+  .modal { background: white; border-radius: 12px; padding: 28px; max-width: 500px; width: 90%; box-shadow: 0 20px 60px rgba(0,0,0,0.3); }
+  .modal h3 { font-size: 1rem; margin-bottom: 10px; }
+  .modal p  { font-size: 0.85rem; color: var(--muted); margin-bottom: 20px; line-height: 1.6; }
+  .modal-actions { display: flex; gap: 10px; justify-content: flex-end; }
+
+  /* Tabla */
+  .tabla-wrap { background: var(--surface); border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.07); overflow: hidden; }
+  .tabla-header {
+    padding: 14px 18px; display: flex; justify-content: space-between; align-items: center;
+    border-bottom: 1px solid var(--border); flex-wrap: wrap; gap: 8px;
+  }
+  .tabla-header h3 { font-size: 0.95rem; font-weight: 600; }
+  .tabla-header span { font-size: 0.8rem; color: var(--muted); }
+  .table-scroll { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+  thead th {
+    background: #f8fafc; padding: 10px 12px; text-align: left;
+    font-size: 0.7rem; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.04em; color: var(--muted); border-bottom: 1px solid var(--border); white-space: nowrap;
+  }
+  tbody tr { border-bottom: 1px solid #f1f3f5; }
+  tbody tr:hover { background: #f8fafb; }
+  tbody td { padding: 8px 12px; vertical-align: middle; }
+
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 0.7rem; font-weight: 600; }
+  .badge-nuevo { background: var(--accent-light); color: var(--accent); }
+  .badge-dup   { background: var(--warning-light); color: var(--warning); }
+  .badge-error { background: var(--danger-light); color: var(--danger); }
+
+  .filtros {
+    background: var(--surface); border-radius: 10px; padding: 13px 18px;
+    margin-bottom: 16px; display: flex; gap: 12px; flex-wrap: wrap; align-items: center;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.04);
+  }
+  .filtros select, .filtros input[type="text"] {
+    border: 1px solid var(--border); border-radius: 6px; padding: 6px 11px;
+    font-size: 0.84rem; color: var(--text); background: white; outline: none;
+  }
+  .filtros label { font-size: 0.82rem; color: var(--muted); }
+
+  .empty-state { text-align: center; padding: 50px; color: var(--muted); }
+  .empty-state .icon { font-size: 2.5rem; margin-bottom: 10px; }
+
+  .alerta {
+    border-radius: 8px; padding: 12px 16px; margin-bottom: 20px;
+    font-size: 0.87rem; display: none;
+  }
+  .alerta-warn { background: var(--warning-light); color: var(--warning); border: 1px solid #fcd34d; }
+  .alerta-ok   { background: var(--accent-light); color: var(--accent); border: 1px solid #6ee7b7; }
+
+  .toast {
+    position: fixed; bottom: 24px; right: 24px; background: #1f2937; color: white;
+    padding: 12px 20px; border-radius: 8px; font-size: 0.85rem; z-index: 9999;
+    opacity: 0; transform: translateY(10px); transition: 0.3s; pointer-events: none;
+  }
+  .toast.show { opacity: 1; transform: translateY(0); }
+  .toast.error { background: var(--danger); }
+
+  footer { text-align: center; padding: 24px; color: var(--muted); font-size: 0.8rem; }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>SION Finanzas</h1>
+    <p>Sistema de conciliación y control financiero</p>
+  </div>
+  <a href="index.html">← Volver al panel</a>
+</header>
+
+<div class="container">
+  <h2>Ingreso Programa</h2>
+
+  <!-- Config -->
+  <div class="config-bar">
+    <label>Mes:</label>
+    <select id="selectMes">
+      <option value="01">Enero</option>
+      <option value="02">Febrero</option>
+      <option value="03" selected>Marzo</option>
+      <option value="04">Abril</option>
+      <option value="05">Mayo</option>
+      <option value="06">Junio</option>
+      <option value="07">Julio</option>
+      <option value="08">Agosto</option>
+      <option value="09">Septiembre</option>
+      <option value="10">Octubre</option>
+      <option value="11">Noviembre</option>
+      <option value="12">Diciembre</option>
+    </select>
+    <label>Año:</label>
+    <select id="selectAnio">
+      <option value="2026" selected>2026</option>
+      <option value="2025">2025</option>
+    </select>
+    <button class="btn btn-secondary" onclick="verRegistros()">👁 Ver registros guardados</button>
+    <button class="btn btn-danger" id="btnBorrarMes" onclick="confirmarBorrarMes()" style="display:none;">🗑 Borrar mes</button>
+  </div>
+
+  <div class="alerta alerta-warn" id="alertaWarn"></div>
+  <div class="alerta alerta-ok"   id="alertaOk"></div>
+
+  <!-- Upload -->
+  <div class="upload-zone" id="uploadZone" onclick="document.getElementById('filePrograma').click()">
+    <div class="icon">📋</div>
+    <h3>Arrastrá el archivo Ingreso Programa aquí</h3>
+    <p>El sistema detecta recibos duplicados y solo agrega los nuevos</p>
+    <br>
+    <button class="btn btn-primary" onclick="event.stopPropagation(); document.getElementById('filePrograma').click()">
+      📂 Seleccionar archivo
+    </button>
+    <input type="file" id="filePrograma" accept=".xlsx,.xls" onchange="procesarArchivo(this)">
+  </div>
+
+  <!-- Resumen preview -->
+  <div class="resumen" id="resumenDiv" style="display:none;">
+    <div class="stat info">
+      <div class="label">Total en archivo</div>
+      <div class="value" id="sTotalArchivo">0</div>
+    </div>
+    <div class="stat ok">
+      <div class="label">Nuevos a importar</div>
+      <div class="value" id="sNuevos">0</div>
+    </div>
+    <div class="stat dup">
+      <div class="label">Ya existentes</div>
+      <div class="value" id="sDuplicados">0</div>
+    </div>
+    <div class="stat">
+      <div class="label">Total guardado en BD</div>
+      <div class="value" id="sTotalBD">0</div>
+    </div>
+  </div>
+
+  <!-- Acciones -->
+  <div id="accionesDiv" style="display:none; margin-bottom:24px; display:none; gap:12px; flex-wrap:wrap;">
+    <button class="btn btn-primary" id="btnImportar" onclick="importarNuevos()">⬆ Importar nuevos registros</button>
+    <button class="btn btn-secondary" onclick="limpiarVista()">✕ Cancelar</button>
+  </div>
+
+  <!-- Filtros -->
+  <div class="filtros" id="filtrosDiv" style="display:none;">
+    <label>Mostrar:</label>
+    <select id="filtroEstado" onchange="renderTabla()">
+      <option value="">Todos</option>
+      <option value="nuevo">Solo nuevos</option>
+      <option value="duplicado">Solo duplicados</option>
+    </select>
+    <label>Banco:</label>
+    <select id="filtroBanco" onchange="renderTabla()">
+      <option value="">Todos</option>
+      <option>BANCOLOMBIA SION</option>
+      <option>INDEPENDIENTES</option>
+      <option>DAVIPLATA</option>
+    </select>
+    <label>Buscar:</label>
+    <input type="text" id="filtroBuscar" placeholder="Recibo, afiliado..." oninput="renderTabla()">
+  </div>
+
+  <!-- Tabla preview -->
+  <div class="tabla-wrap" id="tablaWrap" style="display:none;">
+    <div class="tabla-header">
+      <h3 id="tituloTabla">Vista previa</h3>
+      <span id="contadorTabla"></span>
+    </div>
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Estado</th>
+            <th>Recibo</th>
+            <th>Afiliado</th>
+            <th>Banco</th>
+            <th>Periodo</th>
+            <th>Total</th>
+            <th>Total SS</th>
+            <th>SS Válido</th>
+            <th>N° Planilla</th>
+            <th>Asesor</th>
+          </tr>
+        </thead>
+        <tbody id="tablaCuerpo"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Modal borrar mes -->
+<div class="modal-overlay" id="modalBorrar">
+  <div class="modal">
+    <h3>⚠️ Confirmar eliminación</h3>
+    <p id="modalBorrarMsg"></p>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="cerrarModal()">Cancelar</button>
+      <button class="btn btn-danger" onclick="borrarMes()">Sí, borrar</button>
+    </div>
+  </div>
+</div>
+
+<footer>SION ERP • Sistema financiero</footer>
+<div class="toast" id="toast"></div>
+
+<script>
+  const { createClient } = supabase;
+  const sb = createClient(
+    'https://tatrfmssficxexleyvdd.supabase.co',
+    'sb_publishable_szrMuEOOopjJUTo0hgUfhQ_v_idMvXI'
+  );
+
+  let preview    = []; // todos los registros del archivo
+  let nuevos     = []; // solo los que no existen en BD
+  let existentes = []; // los que ya están en BD
+
+  // Drag & drop
+  const zone = document.getElementById('uploadZone');
+  zone.addEventListener('dragover', e => { e.preventDefault(); zone.style.borderColor = 'var(--accent)'; });
+  zone.addEventListener('dragleave', () => zone.style.borderColor = '');
+  zone.addEventListener('drop', e => {
+    e.preventDefault(); zone.style.borderColor = '';
+    if (e.dataTransfer.files[0]) {
+      const input = document.getElementById('filePrograma');
+      const dt = new DataTransfer();
+      dt.items.add(e.dataTransfer.files[0]);
+      input.files = dt.files;
+      procesarArchivo(input);
+    }
+  });
+
+  // ── Procesar archivo ──────────────────────────────────────
+  async function procesarArchivo(input) {
+    const archivo = input.files[0];
+    if (!archivo) return;
+    mostrarToast('⏳ Leyendo archivo...');
+
+    const reader = new FileReader();
+    reader.onload = async function(e) {
+      try {
+        const wb = XLSX.read(new Uint8Array(e.target.result), { type: 'array', raw: true });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const rows = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true });
+
+        // Buscar fila de encabezados
+        let headerRow = 1;
+        for (let i = 0; i < rows.length; i++) {
+          if (rows[i] && rows[i].includes('Recibo')) { headerRow = i; break; }
+        }
+
+        const headers = rows[headerRow];
+        const idx = {
+          recibo:   headers.indexOf('Recibo'),
+          cc:       headers.indexOf('C.C.'),
+          afiliado: headers.indexOf('Afiliado'),
+          banco:    headers.indexOf('Banco'),
+          detalle:  headers.indexOf('Detalle'),
+          periodo:  headers.indexOf('Periodo'),
+          total:    headers.indexOf('Total'),
+          totalSS:  headers.indexOf('Total SS'),
+          epsVal:   18, arlVal: 20, afpVal: 22, ccfVal: 24,
+          fsp:      headers.indexOf('FSP'),
+          admon:    headers.indexOf('Admon'),
+          intereses:headers.indexOf('Intereses'),
+          asesor:   headers.indexOf('Asesor'),
+          planilla: headers.indexOf('No.Planilla'),
+          matriz:   headers.indexOf('Matriz'),
+          cotizante:headers.indexOf('Cotizante'),
+        };
+
+        const mes  = document.getElementById('selectMes').value;
+        const anio = document.getElementById('selectAnio').value;
+
+        preview = [];
+        for (let i = headerRow + 1; i < rows.length; i++) {
+          const r = rows[i];
+          if (!r || !r[idx.recibo]) continue;
+
+          const epsV  = Number(r[idx.epsVal])  || 0;
+          const arlV  = Number(r[idx.arlVal])  || 0;
+          const afpV  = Number(r[idx.afpVal])  || 0;
+          const ccfV  = Number(r[idx.ccfVal])  || 0;
+          const totalSS = Number(r[idx.totalSS]) || 0;
+          const ssOk  = Math.abs((epsV + arlV + afpV + ccfV) - totalSS) < 1;
+
+          preview.push({
+            mes, anio,
+            recibo:    String(r[idx.recibo]).trim(),
+            cc:        String(r[idx.cc] || ''),
+            afiliado:  String(r[idx.afiliado] || ''),
+            banco:     String(r[idx.banco] || ''),
+            detalle:   String(r[idx.detalle] || ''),
+            periodo:   String(r[idx.periodo] || ''),
+            total:     Number(r[idx.total])   || 0,
+            total_ss:  totalSS,
+            eps_val:   epsV, arl_val: arlV, afp_val: afpV, ccf_val: ccfV,
+            fsp:       Number(r[idx.fsp])      || 0,
+            admon:     Number(r[idx.admon])    || 0,
+            intereses: Number(r[idx.intereses])|| 0,
+            asesor:    String(r[idx.asesor] || ''),
+            planilla:  r[idx.planilla] ? String(r[idx.planilla]) : '',
+            matriz:    String(r[idx.matriz]    || ''),
+            cotizante: String(r[idx.cotizante] || ''),
+            ss_ok:     ssOk,
+          });
+        }
+
+        if (preview.length === 0) {
+          mostrarToast('No se encontraron registros en el archivo', true); return;
+        }
+
+        // Buscar recibos ya existentes en BD para este mes/año
+        const { data: existDB, error } = await sb
+          .from('ingreso_programa')
+          .select('recibo')
+          .eq('mes', mes)
+          .eq('anio', anio);
+
+        if (error) { mostrarToast('Error consultando BD', true); return; }
+
+        const recibosExistentes = new Set((existDB || []).map(r => r.recibo));
+
+        nuevos     = preview.filter(r => !recibosExistentes.has(r.recibo));
+        existentes = preview.filter(r =>  recibosExistentes.has(r.recibo));
+
+        // Contar total en BD
+        const { count } = await sb
+          .from('ingreso_programa')
+          .select('*', { count: 'exact', head: true })
+          .eq('mes', mes).eq('anio', anio);
+
+        // Mostrar resumen
+        document.getElementById('sTotalArchivo').textContent = preview.length;
+        document.getElementById('sNuevos').textContent       = nuevos.length;
+        document.getElementById('sDuplicados').textContent   = existentes.length;
+        document.getElementById('sTotalBD').textContent      = count || 0;
+
+        document.getElementById('resumenDiv').style.display  = 'grid';
+        document.getElementById('accionesDiv').style.display = nuevos.length > 0 ? 'flex' : 'none';
+        document.getElementById('filtrosDiv').style.display  = 'flex';
+        document.getElementById('tablaWrap').style.display   = 'block';
+        document.getElementById('btnBorrarMes').style.display = 'inline-block';
+
+        const meses = ['','Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+        document.getElementById('tituloTabla').textContent =
+          `Vista previa — ${meses[parseInt(mes)]} ${anio}`;
+
+        if (nuevos.length === 0) {
+          mostrarAlerta('warn', `⚠️ Todos los ${preview.length} registros del archivo ya existen en la base de datos para ${meses[parseInt(mes)]} ${anio}.`);
+        } else {
+          mostrarAlerta('ok', `✅ Se encontraron ${nuevos.length} registros nuevos listos para importar. ${existentes.length > 0 ? existentes.length + ' ya existen y serán omitidos.' : ''}`);
+        }
+
+        renderTabla();
+        mostrarToast(`✅ Archivo leído — ${preview.length} registros`);
+
+      } catch(err) {
+        mostrarToast('Error procesando el archivo', true);
+        console.error(err);
+      }
+    };
+    reader.readAsArrayBuffer(archivo);
+  }
+
+  // ── Importar nuevos ───────────────────────────────────────
+  async function importarNuevos() {
+    if (nuevos.length === 0) return;
+    mostrarToast('⏳ Guardando en base de datos...');
+
+    // Insertar en lotes de 100
+    const lote = 100;
+    for (let i = 0; i < nuevos.length; i += lote) {
+      const { error } = await sb.from('ingreso_programa').insert(nuevos.slice(i, i + lote));
+      if (error) { mostrarToast('Error guardando: ' + error.message, true); console.error(error); return; }
+    }
+
+    const mes  = document.getElementById('selectMes').value;
+    const anio = document.getElementById('selectAnio').value;
+    const meses = ['','Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+
+    mostrarToast(`✅ ${nuevos.length} registros guardados — ${meses[parseInt(mes)]} ${anio}`);
+    mostrarAlerta('ok', `✅ ${nuevos.length} registros importados correctamente para ${meses[parseInt(mes)]} ${anio}.`);
+    document.getElementById('accionesDiv').style.display = 'none';
+
+    // Actualizar contador BD
+    const { count } = await sb
+      .from('ingreso_programa')
+      .select('*', { count: 'exact', head: true })
+      .eq('mes', mes).eq('anio', anio);
+    document.getElementById('sTotalBD').textContent = count || 0;
+
+    // Mover nuevos a existentes
+    existentes = [...existentes, ...nuevos];
+    nuevos = [];
+    document.getElementById('sNuevos').textContent     = 0;
+    document.getElementById('sDuplicados').textContent = existentes.length;
+    renderTabla();
+  }
+
+  // ── Ver registros guardados ───────────────────────────────
+  async function verRegistros() {
+    const mes  = document.getElementById('selectMes').value;
+    const anio = document.getElementById('selectAnio').value;
+    mostrarToast('⏳ Cargando registros...');
+
+    const { data, error, count } = await sb
+      .from('ingreso_programa')
+      .select('*', { count: 'exact' })
+      .eq('mes', mes).eq('anio', anio)
+      .order('recibo');
+
+    if (error) { mostrarToast('Error: ' + error.message, true); return; }
+
+    const meses = ['','Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+
+    if (!data || data.length === 0) {
+      mostrarAlerta('warn', `⚠️ No hay registros guardados para ${meses[parseInt(mes)]} ${anio}.`);
+      document.getElementById('tablaWrap').style.display = 'none';
+      mostrarToast('Sin registros para ese mes', true);
+      return;
+    }
+
+    preview    = data.map(r => ({ ...r, _estado: 'guardado' }));
+    nuevos     = [];
+    existentes = data;
+
+    document.getElementById('sTotalArchivo').textContent = data.length;
+    document.getElementById('sNuevos').textContent       = 0;
+    document.getElementById('sDuplicados').textContent   = data.length;
+    document.getElementById('sTotalBD').textContent      = count || data.length;
+    document.getElementById('resumenDiv').style.display  = 'grid';
+    document.getElementById('filtrosDiv').style.display  = 'flex';
+    document.getElementById('tablaWrap').style.display   = 'block';
+    document.getElementById('btnBorrarMes').style.display = 'inline-block';
+    document.getElementById('tituloTabla').textContent   = `Registros guardados — ${meses[parseInt(mes)]} ${anio}`;
+
+    renderTabla();
+    mostrarToast(`✅ ${data.length} registros cargados`);
+  }
+
+  // ── Render tabla ──────────────────────────────────────────
+  function renderTabla() {
+    const filtroE  = document.getElementById('filtroEstado').value;
+    const filtroBanco = document.getElementById('filtroBanco').value;
+    const buscar   = document.getElementById('filtroBuscar').value.toLowerCase();
+
+    const todos = [
+      ...nuevos.map(r => ({ ...r, _estado: 'nuevo' })),
+      ...existentes.map(r => ({ ...r, _estado: 'duplicado' }))
+    ];
+
+    const filtrados = todos.filter(r => {
+      const matchE = !filtroE || r._estado === filtroE;
+      const matchB = !filtroBanco || (r.banco||'').includes(filtroBanco);
+      const matchS = !buscar ||
+        (r.recibo  ||'').toLowerCase().includes(buscar) ||
+        (r.afiliado||'').toLowerCase().includes(buscar);
+      return matchE && matchB && matchS;
+    });
+
+    document.getElementById('contadorTabla').textContent = `${filtrados.length} registros`;
+
+    const tbody = document.getElementById('tablaCuerpo');
+    if (filtrados.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="11"><div class="empty-state"><div class="icon">🔍</div><p>Sin resultados</p></div></td></tr>`;
+      return;
+    }
+
+    tbody.innerHTML = filtrados.map((r, i) => `
+      <tr>
+        <td style="color:var(--muted);font-size:0.75rem;">${i+1}</td>
+        <td>
+          <span class="badge badge-${r._estado}">
+            ${r._estado === 'nuevo' ? '✅ Nuevo' : r._estado === 'guardado' ? '💾 Guardado' : '🔁 Ya existe'}
+          </span>
+        </td>
+        <td style="font-size:0.78rem;">${r.recibo}</td>
+        <td>${r.afiliado}</td>
+        <td style="font-size:0.78rem;color:var(--muted);">${r.banco}</td>
+        <td style="font-size:0.78rem;">${r.periodo}</td>
+        <td style="font-weight:600;color:var(--accent);">${formatCOP(r.total)}</td>
+        <td style="font-size:0.78rem;">${formatCOP(r.total_ss || r.totalSS || 0)}</td>
+        <td style="text-align:center;">${r.ss_ok ? '✅' : '❌'}</td>
+        <td style="font-size:0.78rem;">${r.planilla || '—'}</td>
+        <td style="font-size:0.78rem;color:var(--muted);">${r.asesor || '—'}</td>
+      </tr>
+    `).join('');
+  }
+
+  // ── Borrar mes ────────────────────────────────────────────
+  function confirmarBorrarMes() {
+    const mes  = document.getElementById('selectMes').value;
+    const anio = document.getElementById('selectAnio').value;
+    const meses = ['','Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+    document.getElementById('modalBorrarMsg').textContent =
+      `¿Estás seguro que querés borrar todos los registros de ${meses[parseInt(mes)]} ${anio}? Esta acción no se puede deshacer.`;
+    document.getElementById('modalBorrar').classList.add('show');
+  }
+
+  async function borrarMes() {
+    cerrarModal();
+    const mes  = document.getElementById('selectMes').value;
+    const anio = document.getElementById('selectAnio').value;
+    const { error } = await sb.from('ingreso_programa').delete().eq('mes', mes).eq('anio', anio);
+    if (error) { mostrarToast('Error borrando', true); return; }
+    mostrarToast('✅ Registros del mes eliminados');
+    limpiarVista();
+  }
+
+  function cerrarModal() { document.getElementById('modalBorrar').classList.remove('show'); }
+
+  function limpiarVista() {
+    preview = []; nuevos = []; existentes = [];
+    document.getElementById('resumenDiv').style.display  = 'none';
+    document.getElementById('accionesDiv').style.display = 'none';
+    document.getElementById('filtrosDiv').style.display  = 'none';
+    document.getElementById('tablaWrap').style.display   = 'none';
+    document.getElementById('btnBorrarMes').style.display= 'none';
+    ocultarAlertas();
+  }
+
+  // ── Helpers ───────────────────────────────────────────────
+  function formatCOP(n) {
+    return new Intl.NumberFormat('es-CO',{style:'currency',currency:'COP',minimumFractionDigits:0,maximumFractionDigits:0}).format(n||0);
+  }
+  function mostrarAlerta(tipo, msg) {
+    ocultarAlertas();
+    const el = document.getElementById('alerta' + (tipo === 'warn' ? 'Warn' : 'Ok'));
+    el.textContent = msg; el.style.display = 'block';
+  }
+  function ocultarAlertas() {
+    document.getElementById('alertaWarn').style.display = 'none';
+    document.getElementById('alertaOk').style.display   = 'none';
+  }
+  function mostrarToast(msg, error=false) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.className = 'toast show' + (error?' error':'');
+    setTimeout(()=>t.className='toast', 3500);
+  }
+</script>
+</body>
+</html>
 
