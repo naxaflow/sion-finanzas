@@ -649,7 +649,7 @@
   function formatCOP(n) {
     return new Intl.NumberFormat('es-CO',{style:'currency',currency:'COP',minimumFractionDigits:0,maximumFractionDigits:0}).format(n);
   }
-  function formatMontoRaw(n) { return Number(n).toLocaleString('es-CO'); }
+  function formatMontoRaw(n) { const num = Number(n); return (num < 0 ? '-' : '') + Math.abs(num).toLocaleString('es-CO'); }
   function esc(s) { return (s||'').replace(/"/g,'&quot;').replace(/</g,'&lt;'); }
   function mostrarToast(msg, error=false) {
     const t = document.getElementById('toast');
