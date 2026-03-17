@@ -270,7 +270,7 @@
 
     // 1. Movimientos banco
     const { data: movs, error: e1 } = await sb
-      .from('movimientos').select('cuenta, concepto, monto, fecha, descripcion, recibo, fecha_orden')
+      .from('movimientos').select('id, cuenta, concepto, monto, fecha, descripcion, recibo, fecha_orden, numero_planilla')
       .gte('fecha_orden', fechaDesde).lte('fecha_orden', fechaHasta);
     if (e1) { mostrarToast('Error cargando movimientos', true); return; }
 
