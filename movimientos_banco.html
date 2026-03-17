@@ -237,7 +237,7 @@
     <select id="filtroConcepto" onchange="renderTabla()">
       <option value="">Todos</option>
       <option>Costo Fijo</option>
-      <option>Seguridad Social</option>
+      <option>Devoluciones</option>
       <option>Gastos Bancarios</option>
       <option>Hernan</option>
       <option>Incapacidad</option>
@@ -246,6 +246,7 @@
       <option>Otros gastos</option>
       <option>Otros Ingresos</option>
       <option>Planillas Pagadas</option>
+      <option>Seguridad Social</option>
     </select>
     <label>Buscar:</label>
     <input type="text" id="filtroBuscar" placeholder="Descripción, recibo, planilla..." oninput="renderTabla()">
@@ -307,9 +308,9 @@
   );
 
   const CONCEPTOS = [
-    '', 'Costo Fijo', 'Seguridad Social', 'Gastos Bancarios', 'Hernan',
+    '', 'Costo Fijo', 'Devoluciones', 'Gastos Bancarios', 'Hernan',
     'Incapacidad', 'Inc-Pagada', 'Ingreso Intereses',
-    'Otros gastos', 'Otros Ingresos', 'Planillas Pagadas'
+    'Otros gastos', 'Otros Ingresos', 'Planillas Pagadas', 'Seguridad Social'
   ];
 
   let movimientos = [];
