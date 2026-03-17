@@ -583,21 +583,22 @@
           <span class="di-desc">${m.descripcion}</span>
           <span class="di-monto">${formatCOP(Number(m.monto))}</span>
           <span class="di-recibo">${m.recibo || '— sin recibo'}</span>
-          <select class="di-concepto" id="conc_${m.id}">
+          <select class="di-concepto" id="conc_${m.id}" data-id="${m.id}">
             ${CONCEPTOS_LIST.map(c => `<option value="${c}" ${c===m.concepto?'selected':''}>${c||'-- Concepto --'}</option>`).join('')}
           </select>
-          <button class="di-save" onclick="guardarConceptoDiff('${m.id}')">💾 Guardar</button>
+          <button class="di-save" onclick="guardarConceptoDiff(${m.id})">💾 Guardar</button>
         </div>`;
       }).join('')}
     `).join('');
   }
 
   async function guardarConceptoDiff(id) {
-    const val = document.getElementById('conc_'+id).value;
+    const val = document.getElementById('conc_'+id)?.value;
+    if (!val) { mostrarToast('Seleccioná un concepto', true); return; }
     const { error } = await sb.from('movimientos').update({ concepto: val }).eq('id', id);
     if (error) { mostrarToast('Error: ' + error.message, true); return; }
     // Actualizar en memoria
-    const idx = datosAnalisis.movs.findIndex(m => m.id === id);
+    const idx = datosAnalisis.movs.findIndex(m => String(m.id) === String(id));
     if (idx !== -1) datosAnalisis.movs[idx].concepto = val;
     mostrarToast('✓ Concepto actualizado — regenerando análisis...');
     setTimeout(() => renderAnalisis(), 500);
