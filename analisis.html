@@ -543,15 +543,26 @@
         sinCruce.forEach(m => items.push({ tipo: 'editable', seccion: `${cuenta.emoji} ${cuenta.id} — SS sin cruce`, m }));
       }
 
-      // Diferencia Planillas — mostrar movimientos de Planillas Pagadas
+      // Diferencia Planillas — mostrar solo movimientos sin número de planilla
+      // que suman aproximadamente la diferencia
       if (Math.abs(diffPlan) >= 1) {
-        const planMovs = movsCuenta.filter(m => m.concepto === 'Planillas Pagadas');
-        if (planMovs.length > 0) {
-          planMovs.forEach(m => items.push({ tipo: 'editable', seccion: `${cuenta.emoji} ${cuenta.id} — Planillas Pagadas (diferencia $${Math.abs(diffPlan).toLocaleString('es-CO')})`, m }));
-        } else {
-          // No hay movimientos de planillas en banco — mostrar los SS sin planilla asignada
-          const sinPlan = movsCuenta.filter(m => m.concepto === 'Seguridad Social' && !m.numero_planilla);
-          sinPlan.forEach(m => items.push({ tipo: 'editable', seccion: `${cuenta.emoji} ${cuenta.id} — Sin planilla asignada (diferencia $${Math.abs(diffPlan).toLocaleString('es-CO')})`, m }));
+        const sinPlanilla = movsCuenta.filter(m =>
+          m.concepto === 'Planillas Pagadas' && !m.numero_planilla
+        );
+        // Acumular hasta cubrir la diferencia
+        let acum = 0;
+        const aMostrar = [];
+        for (const m of sinPlanilla) {
+          acum += Math.abs(Number(m.monto));
+          aMostrar.push(m);
+          if (acum >= Math.abs(diffPlan)) break;
+        }
+        if (aMostrar.length > 0) {
+          aMostrar.forEach(m => items.push({
+            tipo: 'editable',
+            seccion: `${cuenta.emoji} ${cuenta.id} — Planillas sin cruzar (diferencia $${Math.abs(diffPlan).toLocaleString('es-CO')})`,
+            m
+          }));
         }
       }
     }
