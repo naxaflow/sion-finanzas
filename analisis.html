@@ -439,7 +439,7 @@
           <hr class="divider">
           ${Object.entries(banco).filter(([,v])=>v>0).map(([k,v])=>{
             const cid = cuenta.id;
-            return '<div class="cuenta-row ver-detalle-btn" style="cursor:pointer;" data-cuenta="' + cid + '" data-concepto="' + k + '">'
+            return '<div class="cuenta-row ver-detalle-btn" style="cursor:pointer;" data-cuenta="' + escHTML(cid) + '" data-concepto="' + escHTML(k) + '">'
               + '<span class="label">↑ ' + k + '</span>'
               + '<span class="valor pos">' + formatCOP(v) + '</span>'
               + '<span style="font-size:0.7rem;color:var(--accent);margin-left:6px;">👁 Ver</span>'
@@ -448,7 +448,7 @@
           <hr class="divider">
           ${Object.entries(banco).filter(([,v])=>v<0).map(([k,v])=>{
             const cid = cuenta.id;
-            return '<div class="cuenta-row ver-detalle-btn" style="cursor:pointer;" data-cuenta="' + cid + '" data-concepto="' + k + '">'
+            return '<div class="cuenta-row ver-detalle-btn" style="cursor:pointer;" data-cuenta="' + escHTML(cid) + '" data-concepto="' + escHTML(k) + '">'
               + '<span class="label">↓ ' + k + '</span>'
               + '<span class="valor neg">' + formatCOP(v) + '</span>'
               + '<span style="font-size:0.7rem;color:var(--accent);margin-left:6px;">👁 Ver</span>'
@@ -813,6 +813,13 @@
   function formatCOP(n) {
     return new Intl.NumberFormat('es-CO',{style:'currency',currency:'COP',
       minimumFractionDigits:2,maximumFractionDigits:2}).format(n||0);
+  }
+  function formatCOP2(n) {
+    return new Intl.NumberFormat('es-CO',{style:'currency',currency:'COP',
+      minimumFractionDigits:2,maximumFractionDigits:2}).format(n||0);
+  }
+  function escHTML(str) {
+    return String(str).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/'/g,'&#39;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   }
   function mostrarToast(msg, error=false) {
     const t = document.getElementById('toast');
