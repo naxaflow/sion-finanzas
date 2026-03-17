@@ -421,7 +421,7 @@
     document.getElementById('tablaComparativa').style.display = 'block';
 
     // Mostrar panel de diferencias para Banco SION
-    renderDiffPanel(movs, progPorCuenta['Banco SION']?.total || 0, CUENTAS[0]);
+    renderDiffPanel(movs, progPorCuenta);
     document.getElementById('tituloComparativa').textContent =
       `Comparativo Banco vs Programa — ${MESES_NOMBRE[parseInt(mes)]} ${anio}`;
   }
@@ -515,44 +515,75 @@
   const CONCEPTOS_LIST = ['','Costo Fijo','Seguridad Social','Gastos Bancarios','Hernan',
     'Incapacidad','Inc-Pagada','Ingreso Intereses','Otros gastos','Otros Ingresos','Planillas Pagadas'];
 
-  function renderDiffPanel(movsBanco, progTotal, cuenta) {
-    // Movimientos de SS banco que no tienen recibo en programa
-    // Detectar los que no cruzaron: comparar recibos del banco vs programa
-    const progRecibos = new Set(
-      (datosAnalisis.prog || [])
-        .filter(p => p.banco && p.banco.toUpperCase().includes(cuenta.progBanco.split(' ')[0]))
-        .map(p => p.planilla)
-        .filter(Boolean)
-    );
+  function renderDiffPanel(movsBanco, progPorCuenta) {
+    const list = document.getElementById('diffList');
+    const items = [];
 
-    // Mostrar movimientos SS sin recibo o con nota de error
-    const sinCruce = movsBanco.filter(m =>
-      m.cuenta === cuenta.id &&
-      (m.concepto === 'Seguridad Social' || !m.concepto) &&
-      (!m.recibo || m.recibo.includes('NT ') || m.recibo.includes('ERRADO'))
-    );
+    for (const cuenta of CUENTAS) {
+      const banco  = {};
+      movsBanco.filter(m => m.cuenta === cuenta.id).forEach(m => {
+        const c = m.concepto || '(sin concepto)';
+        banco[c] = (banco[c] || 0) + Number(m.monto);
+      });
 
-    if (sinCruce.length === 0) {
+      const prog_c = progPorCuenta[cuenta.id] || { total: 0, totalSS: 0, admon: 0 };
+      const ssBanco      = banco['Seguridad Social'] || 0;
+      const planBanco    = Math.abs(banco['Planillas Pagadas'] || 0);
+      const diffSS       = ssBanco - prog_c.total;
+      const diffPlan     = planBanco - prog_c.totalSS;
+
+      // Diferencia SS — movimientos sin cruce real
+      if (Math.abs(diffSS) >= 1) {
+        // Mostrar movimientos SS sin recibo CI o con nota NT/ERRADO
+        const sinCruce = movsBanco.filter(m =>
+          m.cuenta === cuenta.id &&
+          m.concepto === 'Seguridad Social' &&
+          (!m.recibo || m.recibo.toUpperCase().includes('NT ') || m.recibo.toUpperCase().includes('ERRADO') || m.recibo.toUpperCase().includes('ERROR'))
+        );
+        sinCruce.forEach(m => items.push({ tipo: 'SS sin cruce', cuenta: cuenta.id, emoji: cuenta.emoji, m }));
+      }
+
+      // Diferencia Planillas — informativa
+      if (Math.abs(diffPlan) >= 1) {
+        items.push({
+          tipo: 'info',
+          cuenta: cuenta.id,
+          emoji: cuenta.emoji,
+          texto: diffPlan > 0
+            ? `Hay $${Math.abs(diffPlan).toLocaleString('es-CO')} más pagado en banco que en programa — verificar si hay planillas no registradas`
+            : `Hay $${Math.abs(diffPlan).toLocaleString('es-CO')} pendiente de pago en banco según el programa`
+        });
+      }
+    }
+
+    if (items.length === 0) {
       document.getElementById('diffPanel').style.display = 'none';
       return;
     }
 
     document.getElementById('diffPanel').style.display = 'block';
-    document.getElementById('diffCount').textContent = `${sinCruce.length} movimientos para revisar`;
+    document.getElementById('diffCount').textContent = `${items.length} items para revisar`;
 
-    const list = document.getElementById('diffList');
-    list.innerHTML = sinCruce.map(m => `
-      <div class="diff-item">
-        <span class="di-fecha">${m.fecha}</span>
-        <span class="di-desc">${m.descripcion}</span>
-        <span class="di-monto">${formatCOP(Number(m.monto))}</span>
-        <span class="di-recibo">${m.recibo || '— sin recibo'}</span>
-        <select class="di-concepto" id="conc_${m.id}">
-          ${CONCEPTOS_LIST.map(c => `<option value="${c}" ${c===m.concepto?'selected':''}>${c||'-- Concepto --'}</option>`).join('')}
-        </select>
-        <button class="di-save" onclick="guardarConceptoDiff('${m.id}')">💾 Guardar</button>
-      </div>
-    `).join('');
+    list.innerHTML = items.map(item => {
+      if (item.tipo === 'info') return `
+        <div class="diff-item" style="background:#eff6ff;">
+          <span class="di-fecha">${item.emoji} ${item.cuenta}</span>
+          <span class="di-desc" style="color:#1d4ed8;font-weight:600;">ℹ️ ${item.texto}</span>
+        </div>`;
+
+      const m = item.m;
+      return `
+        <div class="diff-item">
+          <span class="di-fecha">${m.fecha}</span>
+          <span class="di-desc">${m.descripcion}</span>
+          <span class="di-monto">${formatCOP(Number(m.monto))}</span>
+          <span class="di-recibo">${m.recibo || '— sin recibo'}</span>
+          <select class="di-concepto" id="conc_${m.id}">
+            ${CONCEPTOS_LIST.map(c => `<option value="${c}" ${c===m.concepto?'selected':''}>${c||'-- Concepto --'}</option>`).join('')}
+          </select>
+          <button class="di-save" onclick="guardarConceptoDiff('${m.id}')">💾 Guardar</button>
+        </div>`;
+    }).join('');
   }
 
   async function guardarConceptoDiff(id) {
