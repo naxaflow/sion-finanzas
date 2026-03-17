@@ -183,6 +183,7 @@
     <input type="file" id="excelFile" accept=".xlsx,.xls,.csv" style="display:none">
     <button class="btn btn-primary" onclick="agregarManual()">+ Agregar movimiento</button>
     <button class="btn btn-excel" onclick="exportarExcel()">⬇ Exportar Excel</button>
+    <button class="btn" style="background:#4b5563;" onclick="generarPlantilla()">📋 Descargar Plantilla</button>
   </div>
 
   <div class="upload-zone" id="uploadHint" onclick="document.getElementById('excelFile').click()">
@@ -546,7 +547,9 @@
           delExcel.push({
             fecha, canal, descripcion, referencia, monto,
             tipo: monto >= 0 ? 'credito' : 'debito',
-            recibo: '', concepto: '', numero_planilla: '',
+            recibo:         r[7] ? String(r[7]).trim() : '',
+            concepto:       r[8] ? String(r[8]).trim() : '',
+            numero_planilla: r[9] ? String(r[9]).trim() : '',
             fecha_orden: parsearFechaOrden(fecha),
             cuenta
           });
@@ -825,13 +828,41 @@
     const data = movimientos.map(m => ({
       Fecha: m.fecha, Canal: m.canal, Descripción: m.descripcion,
       Referencia: m.referencia, Tipo: m.tipo==='credito'?'Ingreso':'Egreso',
-      Monto: Number(m.monto), Recibo: m.recibo,
-      'N° Planilla': m.numero_planilla, Concepto: m.concepto
+      Monto: Number(m.monto),
+      Recibo: m.recibo || '',
+      Concepto: m.concepto || '',
+      'N° Planilla': m.numero_planilla || ''
     }));
     const ws = XLSX.utils.json_to_sheet(data);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Movimientos');
     XLSX.writeFile(wb, `Movimientos_${cuenta.replace(/ /g,'_')}.xlsx`);
+  }
+
+  // ── Generar plantilla vacía ───────────────────────────────
+  function generarPlantilla() {
+    const data = [
+      {
+        Fecha: '01-ene-26',
+        Canal: 'Bancolombia',
+        Descripción: 'Ejemplo descripción',
+        Referencia: '',
+        Tipo: 'Ingreso',
+        Monto: 100000,
+        Recibo: 'CI-000000',
+        Concepto: 'Seguridad Social',
+        'N° Planilla': '36432763'
+      }
+    ];
+    const ws = XLSX.utils.json_to_sheet(data);
+    // Ancho de columnas
+    ws['!cols'] = [
+      {wch:12},{wch:14},{wch:35},{wch:20},{wch:10},
+      {wch:14},{wch:14},{wch:18},{wch:14}
+    ];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Movimientos');
+    XLSX.writeFile(wb, 'Plantilla_Movimientos_Banco.xlsx');
   }
 
   // ── Helpers ───────────────────────────────────────────────
