@@ -322,7 +322,7 @@
 
     // 1. Movimientos banco
     const { data: movs, error: e1 } = await sb
-      .from('movimientos').select('id, cuenta, concepto, monto, fecha, descripcion, recibo, fecha_orden, numero_planilla')
+      .from('movimientos').select('id, cuenta, concepto, monto, tipo, fecha, descripcion, recibo, fecha_orden, numero_planilla')
       .gte('fecha_orden', fechaDesde).lte('fecha_orden', fechaHasta);
     if (e1) { mostrarToast('Error cargando movimientos', true); return; }
 
@@ -383,7 +383,10 @@
     for (const m of movs) {
       if (!bancoPorCuenta[m.cuenta]) bancoPorCuenta[m.cuenta] = {};
       const c = m.concepto || '(sin concepto)';
-      bancoPorCuenta[m.cuenta][c] = (bancoPorCuenta[m.cuenta][c] || 0) + Number(m.monto);
+      // Forzar signo según tipo: debito siempre negativo, credito siempre positivo
+      let monto = Math.abs(Number(m.monto));
+      if (m.tipo === 'debito') monto = -monto;
+      bancoPorCuenta[m.cuenta][c] = (bancoPorCuenta[m.cuenta][c] || 0) + monto;
     }
 
     // Agrupar programa por banco
