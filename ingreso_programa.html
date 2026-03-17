@@ -522,7 +522,16 @@
         <td style="font-weight:600;color:var(--accent);">${formatCOP(r.total)}</td>
         <td style="font-size:0.78rem;">${formatCOP(r.total_ss||0)}</td>
         <td style="text-align:center;">${r.ss_ok ? '✅' : '❌'}</td>
-        <td style="font-size:0.78rem;">${r.planilla||'—'}</td>
+        <td>
+          <input 
+            style="border:1px solid transparent;border-radius:4px;padding:2px 6px;font-size:0.78rem;width:100px;background:transparent;"
+            value="${r.planilla||''}" 
+            placeholder="N° planilla..."
+            onblur="guardarPlanilla('${r.recibo}', this.value)"
+            onkeydown="if(event.key==='Enter')this.blur()"
+            onfocus="this.style.borderColor='#1e8a5e';this.style.background='white';"
+          >
+        </td>
         <td style="font-size:0.78rem;color:var(--muted);">${r.asesor||'—'}</td>
       </tr>
     `).join('');
@@ -567,6 +576,19 @@
   function formatCOP(n) {
     return new Intl.NumberFormat('es-CO',{style:'currency',currency:'COP',minimumFractionDigits:0,maximumFractionDigits:0}).format(n||0);
   }
+  // ── Guardar planilla ──
+  async function guardarPlanilla(recibo, valor) {
+    if (!recibo) return;
+    const { error } = await sb
+      .from('ingreso_programa')
+      .update({ planilla: valor.trim() })
+      .eq('recibo', recibo);
+    if (error) { mostrarToast('Error guardando planilla', true); return; }
+    const idx = registros.findIndex(r => r.recibo === recibo);
+    if (idx !== -1) registros[idx].planilla = valor.trim();
+    if (valor.trim()) mostrarToast('✓ Planilla guardada');
+  }
+
   function mostrarToast(msg, error=false) {
     const t = document.getElementById('toast');
     t.textContent = msg;
