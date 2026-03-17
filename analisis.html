@@ -571,33 +571,36 @@
       secciones[item.seccion].push(item);
     });
 
-    list.innerHTML = Object.entries(secciones).map(([seccion, grupo]) => `
-      <div style="background:#f8fafc;padding:8px 18px;font-size:0.78rem;font-weight:700;color:var(--warning);border-bottom:1px solid #fcd34d;">
-        ${seccion}
-      </div>
-      ${grupo.map(item => {
+    // Construir HTML sin template literals anidados
+    let html = '';
+    Object.entries(secciones).forEach(([seccion, grupo]) => {
+      html += `<div style="background:#f8fafc;padding:8px 18px;font-size:0.78rem;font-weight:700;color:var(--warning);border-bottom:1px solid #fcd34d;">${seccion}</div>`;
+      grupo.forEach(item => {
         const m = item.m;
-        return `
-        <div class="diff-item">
-          <span class="di-fecha">${m.fecha}</span>
-          <span class="di-desc">${m.descripcion}</span>
-          <span class="di-monto">${formatCOP(Number(m.monto))}</span>
-          <span class="di-recibo">${m.recibo || '— sin recibo'}</span>
-          <select class="di-concepto" id="conc_${m.id}" data-id="${m.id}">
-            ${CONCEPTOS_LIST.map(c => `<option value="${c}" ${c===m.concepto?'selected':''}>${c||'-- Concepto --'}</option>`).join('')}
-          </select>
-          <button class="di-save" onclick="guardarConceptoDiff(${m.id})">💾 Guardar</button>
-        </div>`;
-      }).join('')}
-    `).join('');
+        const mid = m.id;
+        const opts = CONCEPTOS_LIST.map(c => {
+          const sel = c === m.concepto ? 'selected' : '';
+          return `<option value="${c}" ${sel}>${c || '-- Concepto --'}</option>`;
+        }).join('');
+        html += '<div class="diff-item">';
+        html += `<span class="di-fecha">${m.fecha}</span>`;
+        html += `<span class="di-desc">${m.descripcion}</span>`;
+        html += `<span class="di-monto">${formatCOP(Number(m.monto))}</span>`;
+        html += `<span class="di-recibo">${m.recibo || '— sin recibo'}</span>`;
+        html += `<select class="di-concepto" data-id="${mid}">${opts}</select>`;
+        html += `<button class="di-save" data-id="${mid}" onclick="guardarConceptoDiff(this.getAttribute('data-id'))">💾 Guardar</button>`;
+        html += '</div>';
+      });
+    });
+    list.innerHTML = html;
   }
 
   async function guardarConceptoDiff(id) {
-    const val = document.getElementById('conc_'+id)?.value;
+    const select = document.querySelector(`select[data-id="${id}"]`);
+    const val = select?.value;
     if (!val) { mostrarToast('Seleccioná un concepto', true); return; }
     const { error } = await sb.from('movimientos').update({ concepto: val }).eq('id', id);
     if (error) { mostrarToast('Error: ' + error.message, true); return; }
-    // Actualizar en memoria
     const idx = datosAnalisis.movs.findIndex(m => String(m.id) === String(id));
     if (idx !== -1) datosAnalisis.movs[idx].concepto = val;
     mostrarToast('✓ Concepto actualizado — regenerando análisis...');
