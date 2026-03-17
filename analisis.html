@@ -300,7 +300,9 @@
     const progPorCuenta = {};
     for (const p of prog) {
       const banco = p.banco || '';
-      const cuenta = CUENTAS.find(c => banco.toUpperCase().includes(c.progBanco.split(' ')[0]))?.id || banco;
+      const bancoUpper = banco.toUpperCase();
+      const cuentaMatch = CUENTAS.find(c => bancoUpper.includes(c.progBanco.toUpperCase().split(' ')[0]));
+      const cuenta = cuentaMatch?.id || banco;
       if (!progPorCuenta[cuenta]) progPorCuenta[cuenta] = { total: 0, totalSS: 0, admon: 0, count: 0 };
       const total   = Number(p.total)    || 0;
       const totalSS = Number(p.total_ss) || 0;
