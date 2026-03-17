@@ -64,8 +64,9 @@
     padding: 6px 0; border-bottom: 1px solid #f1f3f5; font-size: 0.85rem;
   }
   .cuenta-row:last-child { border-bottom: none; }
-  .cuenta-row .label { color: var(--muted); }
-  .cuenta-row .valor { font-weight: 600; }
+  .cuenta-row .label { color: var(--muted); flex: 1; }
+  .cuenta-row .valor { font-weight: 600; text-align: right; white-space: nowrap; }
+  .cuenta-row .ver-link { font-size:0.7rem; color:var(--accent); margin-left:6px; white-space:nowrap; }
   .cuenta-row .valor.pos { color: var(--accent); }
   .cuenta-row .valor.neg { color: var(--danger); }
   .cuenta-row .valor.diff-ok  { color: var(--accent); }
@@ -334,22 +335,36 @@
     // 3. Saldos iniciales
     const saldosIni = {};
     for (const cuenta of CUENTAS) {
-      let mesPrev = parseInt(mes) - 1;
-      let anioPrev = parseInt(anio);
-      if (mesPrev === 0) { mesPrev = 12; anioPrev--; }
-      const mpStr = String(mesPrev).padStart(2,'0');
-      const apStr = String(anioPrev);
+      // Buscar el registro base más reciente en saldos_iniciales anterior al mes actual
+      // Puede ser dic-2025 o cualquier mes previo que esté guardado
+      const { data: todosLosBase } = await sb.from('saldos_iniciales')
+        .select('saldo, anio, mes')
+        .eq('cuenta', cuenta.id)
+        .order('anio', { ascending: false })
+        .order('mes', { ascending: false });
 
-      const { data: saldoDB } = await sb.from('saldos_iniciales').select('saldo')
-        .eq('cuenta', cuenta.id).eq('anio', apStr).eq('mes', mpStr).single();
+      // Encontrar el registro base más cercano anterior al mes solicitado
+      const mesActualNum = parseInt(anio) * 100 + parseInt(mes);
+      const base = (todosLosBase || []).find(r => {
+        const num = parseInt(r.anio) * 100 + parseInt(r.mes);
+        return num < mesActualNum;
+      });
 
-      if (saldoDB) {
-        const { data: movsPrev } = await sb.from('movimientos').select('monto')
+      if (base) {
+        // Sumar todos los movimientos desde el mes base hasta el mes anterior al actual
+        const fechaDesdeBase = `${base.anio}-${String(base.mes).padStart(2,'0')}-01`;
+        let mesPrev = parseInt(mes) - 1;
+        let anioPrev = parseInt(anio);
+        if (mesPrev === 0) { mesPrev = 12; anioPrev--; }
+        const fechaHastaPrev = `${anioPrev}-${String(mesPrev).padStart(2,'0')}-31`;
+
+        const { data: movsAcum } = await sb.from('movimientos').select('monto')
           .eq('cuenta', cuenta.id)
-          .gte('fecha_orden', `${apStr}-${mpStr}-01`)
-          .lte('fecha_orden', `${apStr}-${mpStr}-31`);
-        const netoPrev = (movsPrev||[]).reduce((s,m)=>s+Number(m.monto),0);
-        saldosIni[cuenta.id] = Number(saldoDB.saldo) + netoPrev;
+          .gte('fecha_orden', fechaDesdeBase)
+          .lte('fecha_orden', fechaHastaPrev);
+
+        const netoAcum = (movsAcum || []).reduce((s, m) => s + Number(m.monto), 0);
+        saldosIni[cuenta.id] = Number(base.saldo) + netoAcum;
       } else {
         saldosIni[cuenta.id] = 0;
       }
@@ -441,8 +456,7 @@
             const cid = cuenta.id;
             return '<div class="cuenta-row ver-detalle-btn" style="cursor:pointer;" data-cuenta="' + escHTML(cid) + '" data-concepto="' + escHTML(k) + '">'
               + '<span class="label">↑ ' + k + '</span>'
-              + '<span class="valor pos">' + formatCOP(v) + '</span>'
-              + '<span style="font-size:0.7rem;color:var(--accent);margin-left:6px;">👁 Ver</span>'
+              + '<span class="valor pos">' + formatCOP(v) + '<span class="ver-link">👁 Ver</span></span>'
               + '</div>';
           }).join('')}
           <hr class="divider">
@@ -450,8 +464,7 @@
             const cid = cuenta.id;
             return '<div class="cuenta-row ver-detalle-btn" style="cursor:pointer;" data-cuenta="' + escHTML(cid) + '" data-concepto="' + escHTML(k) + '">'
               + '<span class="label">↓ ' + k + '</span>'
-              + '<span class="valor neg">' + formatCOP(v) + '</span>'
-              + '<span style="font-size:0.7rem;color:var(--accent);margin-left:6px;">👁 Ver</span>'
+              + '<span class="valor neg">' + formatCOP(v) + '<span class="ver-link">👁 Ver</span></span>'
               + '</div>';
           }).join('')}
           <hr class="divider">
@@ -642,7 +655,7 @@
   }
 
   const CONCEPTOS_LIST = ['','Costo Fijo','Devoluciones','Gastos Bancarios','Hernan',
-    'Incapacidad','Inc-Pagada','Ingreso Intereses','Otros gastos','Otros Ingresos','Planillas Pagadas','Seguridad Social'];
+    'Incapacidad','Inc-Pagada','Ingreso Intereses','Mayor v/pagado','Otros gastos','Otros Ingresos','Planillas Pagadas','Seguridad Social'];
 
   function renderDiffPanel(movsBanco, progPorCuenta) {
     const list = document.getElementById('diffList');
