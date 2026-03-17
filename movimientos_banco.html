@@ -113,7 +113,7 @@
   .input-tabla:focus { border-color: var(--accent); outline: none; background: white; }
   select.input-tabla { cursor: pointer; }
 
-  .recibo-wrap { position: relative; min-width: 120px; }
+  .recibo-wrap { position: relative; width: 100%; }
   .recibo-wrap .autocomplete-hint {
     position: absolute; right: 6px; top: 50%; transform: translateY(-50%);
     font-size: 0.65rem; color: var(--accent); font-weight: 600; pointer-events: none; display: none;
@@ -259,6 +259,19 @@
     </div>
     <div class="table-scroll">
       <table>
+        <colgroup>
+          <col style="width:32px">
+          <col style="width:88px">
+          <col style="width:70px">
+          <col style="width:160px">
+          <col style="width:55px">
+          <col style="width:80px">
+          <col style="width:105px">
+          <col style="width:220px">
+          <col style="width:75px">
+          <col style="width:130px">
+          <col style="width:32px">
+        </colgroup>
         <thead>
           <tr>
             <th>#</th>
@@ -269,12 +282,11 @@
             <th>Tipo</th>
             <th>Monto</th>
             <th>Recibo</th>
-            <th>Planilla</th>
+            <th>No.</th>
             <th>Concepto</th>
             <th></th>
           </tr>
         </thead>
-        <tbody id="tablaCuerpo">
           <tr><td colspan="11">
             <div class="empty-state"><div class="icon">⏳</div><p>Cargando...</p></div>
           </td></tr>
@@ -738,31 +750,31 @@
             onblur="guardarCampo('${m.id}','descripcion',this.value)">
           ${tieneMatch ? `<div style="font-size:0.7rem;color:var(--accent);margin-top:2px;">👤 ${prog.afiliado}</div>` : ''}
         </td>
-        <td><input class="input-tabla" value="${esc(m.referencia)}" style="min-width:60px;max-width:80px;font-size:0.75rem;color:var(--muted);"
+        <td><input class="input-tabla" value="${esc(m.referencia)}" style="width:100%;font-size:0.72rem;color:var(--muted);"
             onblur="guardarCampo('${m.id}','referencia',this.value)"></td>
         <td>
-          <select class="input-tabla" style="width:85px;" onchange="cambiarTipo('${m.id}',this.value)">
+          <select class="input-tabla" style="width:100%;" onchange="cambiarTipo('${m.id}',this.value)">
             <option value="credito" ${m.tipo==='credito'?'selected':''}>Ingreso</option>
             <option value="debito"  ${m.tipo==='debito' ?'selected':''}>Egreso</option>
           </select>
         </td>
         <td>
           <input class="input-tabla" value="${formatMontoRaw(m.monto)}"
-            style="width:105px;text-align:right;color:${m.tipo==='debito'?'var(--debit)':'var(--credit)'};font-weight:600;"
+            style="width:100%;text-align:right;color:${m.tipo==='debito'?'var(--debit)':'var(--credit)'};font-weight:600;"
             onblur="guardarCampo('${m.id}','monto',this.value)">
           ${tieneMatch ? `<div style="font-size:0.68rem;color:var(--muted);">Prog: ${formatMontoRaw(prog.total)}</div>` : ''}
         </td>
         <td>
           <div class="recibo-wrap ${tieneMatch?'matched':''}" data-recibo-wrap="${m.id}">
             <input class="input-tabla" value="${esc(m.recibo)}" placeholder="CI-000000..."
-              style="min-width:160px;" 
+              style="width:100%;font-weight:600;font-size:0.85rem;color:var(--text);"
               onblur="if(this.value.trim())onReciboBlur('${m.id}',this.value)"
               onkeydown="if(event.key==='Enter')this.blur()">
             <span class="autocomplete-hint">${tieneMatch ? '✓ '+prog.afiliado.split(' ')[0] : ''}</span>
           </div>
         </td>
-        <td><input class="input-tabla" value="${esc(m.numero_planilla)}" placeholder="Planilla..."
-            data-planilla="${m.id}" style="min-width:90px;"
+        <td><input class="input-tabla" value="${esc(m.numero_planilla)}" placeholder="No...."
+            data-planilla="${m.id}" style="width:100%;"
             onblur="if(this.value.trim()!==undefined)guardarCampo('${m.id}','numero_planilla',this.value)"
             onkeydown="if(event.key==='Enter')this.blur()"></td>
         <td>
