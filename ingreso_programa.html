@@ -319,7 +319,7 @@
     const { data, error, count } = await sb
       .from('ingreso_programa')
       .select('*', { count: 'exact' })
-      .eq('mes', mes).eq('anio', anio)
+      .eq('mes', mes).eq('anio', parseInt(anio))
       .order('recibo');
 
     if (error) { mostrarToast('Error: ' + error.message, true); return; }
@@ -549,7 +549,7 @@
     cerrarModal();
     const mes  = document.getElementById('selectMes').value;
     const anio = document.getElementById('selectAnio').value;
-    const { error } = await sb.from('ingreso_programa').delete().eq('mes', mes).eq('anio', anio);
+    const { error } = await sb.from('ingreso_programa').delete().eq('mes', mes).eq('anio', parseInt(anio));
     if (error) { mostrarToast('Error: ' + error.message, true); return; }
     mostrarToast('✅ Mes eliminado');
     ocultarTodo();
