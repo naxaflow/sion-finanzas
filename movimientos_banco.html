@@ -664,6 +664,22 @@
     if (campo !== 'monto') mostrarToast('✓ Guardado');
   }
 
+  async function cambiarTipo(id, nuevoTipo) {
+    const mov = movimientos.find(m => m.id === id);
+    if (!mov) return;
+    // Ajustar signo del monto según el tipo
+    let monto = Math.abs(Number(mov.monto));
+    if (nuevoTipo === 'debito') monto = -monto;
+    const { error } = await sb.from('movimientos')
+      .update({ tipo: nuevoTipo, monto })
+      .eq('id', id);
+    if (error) { mostrarToast('Error: ' + error.message, true); return; }
+    const idx = movimientos.findIndex(m => m.id === id);
+    if (idx !== -1) { movimientos[idx].tipo = nuevoTipo; movimientos[idx].monto = monto; }
+    actualizarResumen();
+    mostrarToast('✓ Tipo actualizado');
+  }
+
   async function onReciboBlur(id, valor) {
     await guardarCampo(id, 'recibo', valor);
     if (valor.trim()) await buscarRecibo(id, valor.trim());
@@ -724,7 +740,12 @@
         </td>
         <td><input class="input-tabla" value="${esc(m.referencia)}" style="min-width:90px;"
             onblur="guardarCampo('${m.id}','referencia',this.value)"></td>
-        <td><span class="badge badge-${m.tipo}">${m.tipo==='credito'?'Ingreso':'Egreso'}</span></td>
+        <td>
+          <select class="input-tabla" style="width:85px;" onchange="cambiarTipo('${m.id}',this.value)">
+            <option value="credito" ${m.tipo==='credito'?'selected':''}>Ingreso</option>
+            <option value="debito"  ${m.tipo==='debito' ?'selected':''}>Egreso</option>
+          </select>
+        </td>
         <td>
           <input class="input-tabla" value="${formatMontoRaw(m.monto)}"
             style="width:105px;text-align:right;color:${m.tipo==='debito'?'var(--debit)':'var(--credit)'};font-weight:600;"
