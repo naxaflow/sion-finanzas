@@ -395,6 +395,18 @@
     const grid = document.getElementById('cuentasGrid');
     grid.innerHTML = '';
 
+    // Calcular totales consolidados para tarjeta resumen
+    let admonTotal = 0, gastosTotal = 0, saldosTotal = 0;
+    for (const c of CUENTAS) {
+      const p = progPorCuenta[c.id] || { admon: 0 };
+      admonTotal += p.admon || 0;
+      const b = bancoPorCuenta[c.id] || {};
+      Object.entries(b).forEach(([concepto, val]) => {
+        if (concepto !== 'Planillas Pagadas' && val < 0) gastosTotal += val;
+      });
+      saldosTotal += saldosIni[c.id] || 0;
+    }
+
     for (const cuenta of CUENTAS) {
       const banco = bancoPorCuenta[cuenta.id] || {};
       const prog_c = progPorCuenta[cuenta.id] || { segSocial: 0, admon: 0, count: 0 };
@@ -424,19 +436,23 @@
             <span class="valor">${formatCOP(saldoIni)}</span>
           </div>
           <hr class="divider">
-          ${Object.entries(banco).filter(([,v])=>v>0).map(([k,v])=>`
-          <div class="cuenta-row" style="cursor:pointer;" onclick="verDetalle('${cuenta.id}','${k}')">
-            <span class="label">↑ ${k}</span>
-            <span class="valor pos">${formatCOP(v)}</span>
-            <span style="font-size:0.7rem;color:var(--accent);margin-left:6px;">👁 Ver</span>
-          </div>`).join('')}
+          ${Object.entries(banco).filter(([,v])=>v>0).map(([k,v])=>{
+            const cid = cuenta.id, conc = k;
+            return '<div class="cuenta-row" style="cursor:pointer;" onclick="verDetalle(\'' + cid + '\',\'' + conc + '\')">'
+              + '<span class="label">↑ ' + k + '</span>'
+              + '<span class="valor pos">' + formatCOP(v) + '</span>'
+              + '<span style="font-size:0.7rem;color:var(--accent);margin-left:6px;">👁 Ver</span>'
+              + '</div>';
+          }).join('')}
           <hr class="divider">
-          ${Object.entries(banco).filter(([,v])=>v<0).map(([k,v])=>`
-          <div class="cuenta-row" style="cursor:pointer;" onclick="verDetalle('${cuenta.id}','${k}')">
-            <span class="label">↓ ${k}</span>
-            <span class="valor neg">${formatCOP(v)}</span>
-            <span style="font-size:0.7rem;color:var(--accent);margin-left:6px;">👁 Ver</span>
-          </div>`).join('')}
+          ${Object.entries(banco).filter(([,v])=>v<0).map(([k,v])=>{
+            const cid = cuenta.id, conc = k;
+            return '<div class="cuenta-row" style="cursor:pointer;" onclick="verDetalle(\'' + cid + '\',\'' + conc + '\')">'
+              + '<span class="label">↓ ' + k + '</span>'
+              + '<span class="valor neg">' + formatCOP(v) + '</span>'
+              + '<span style="font-size:0.7rem;color:var(--accent);margin-left:6px;">👁 Ver</span>'
+              + '</div>';
+          }).join('')}
           <hr class="divider">
           <div class="cuenta-row saldo-final">
             <span class="label">Saldo final banco</span>
@@ -463,6 +479,33 @@
         </div>`;
       grid.appendChild(card);
     }
+
+    // Tarjeta resumen consolidado
+    const cardResumen = document.createElement('div');
+    cardResumen.className = 'cuenta-card';
+    const diferencia = admonTotal + gastosTotal;
+    cardResumen.innerHTML = `
+      <div class="cuenta-header" style="background:#1e3a5f;">
+        <span>📊 Resumen Consolidado</span>
+        <span style="font-size:0.78rem;opacity:0.8;">${MESES_NOMBRE[parseInt(mes)]} ${anio}</span>
+      </div>
+      <div class="cuenta-body">
+        <div class="cuenta-row">
+          <span class="label">Admon esperada (3 cuentas)</span>
+          <span class="valor pos">${formatCOP2(admonTotal)}</span>
+        </div>
+        <hr class="divider">
+        <div class="cuenta-row">
+          <span class="label">Total gastos (sin planillas)</span>
+          <span class="valor neg">${formatCOP2(gastosTotal)}</span>
+        </div>
+        <hr class="divider">
+        <div class="cuenta-row saldo-final">
+          <span class="label">Diferencia</span>
+          <span class="valor ${diferencia>=0?'pos':'neg'}">${formatCOP2(diferencia)}</span>
+        </div>
+      </div>`;
+    grid.appendChild(cardResumen);
 
     // Tabla comparativa
     renderTablaComparativa(bancoPorCuenta, progPorCuenta);
