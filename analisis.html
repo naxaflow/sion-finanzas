@@ -537,8 +537,8 @@
     mostrarToast('Función de exportar próximamente');
   }
 
-  const CONCEPTOS_LIST = ['','Costo Fijo','Seguridad Social','Gastos Bancarios','Hernan',
-    'Incapacidad','Inc-Pagada','Ingreso Intereses','Otros gastos','Otros Ingresos','Planillas Pagadas'];
+  const CONCEPTOS_LIST = ['','Costo Fijo','Devoluciones','Gastos Bancarios','Hernan',
+    'Incapacidad','Inc-Pagada','Ingreso Intereses','Otros gastos','Otros Ingresos','Planillas Pagadas','Seguridad Social'];
 
   function renderDiffPanel(movsBanco, progPorCuenta) {
     const list = document.getElementById('diffList');
@@ -548,51 +548,45 @@
       const movsCuenta = movsBanco.filter(m => m.cuenta === cuenta.id);
       const banco = {};
       movsCuenta.forEach(m => {
-        const c = m.concepto || '(sin concepto)';
+        const c = m.concepto || 'Sin concepto';
         banco[c] = (banco[c] || 0) + Number(m.monto);
       });
 
-      const prog_c    = progPorCuenta[cuenta.id] || { total: 0, totalSS: 0, admon: 0 };
-      const ssBanco   = banco['Seguridad Social'] || 0;
-      const planBanco = Math.abs(banco['Planillas Pagadas'] || 0);
-      const diffSS    = ssBanco - prog_c.total;
-      const diffPlan  = planBanco - prog_c.totalSS;
+      const prog_c  = progPorCuenta[cuenta.id] || { total: 0, totalSS: 0, admon: 0 };
+      const ssBanco = banco['Seguridad Social'] || 0;
+      const diffSS  = ssBanco - prog_c.total;
 
-      // Diferencia SS — movimientos sin cruce (sin recibo CI válido o con nota NT/ERRADO)
+      // 1. Movimientos SS con recibo NT (Nota Contable) -> sugerir Devoluciones
       if (Math.abs(diffSS) >= 1) {
-        const sinCruce = movsCuenta.filter(m =>
+        const ntMovs = movsCuenta.filter(m =>
           m.concepto === 'Seguridad Social' &&
-          (!m.recibo || m.recibo.toUpperCase().includes('NT ') ||
-           m.recibo.toUpperCase().includes('ERRADO') || m.recibo.toUpperCase().includes('ERROR'))
+          m.recibo && m.recibo.toUpperCase().startsWith('NT ')
         );
-        sinCruce.forEach(m => items.push({ tipo: 'editable', seccion: `${cuenta.emoji} ${cuenta.id} — SS sin cruce`, m }));
-      }
+        ntMovs.forEach(m => items.push({
+          seccion: `${cuenta.emoji} ${cuenta.id} — Nota Contable (NT) — sugerido: Devoluciones`,
+          sugerido: 'Devoluciones',
+          m
+        }));
 
-      // Planillas en banco sin cruce en programa — recibo empieza con CN
-      const cnSinCruce = movsCuenta.filter(m =>
-        m.concepto === 'Planillas Pagadas' &&
-        m.recibo && m.recibo.toUpperCase().startsWith('CN ')
-      );
-      if (cnSinCruce.length > 0) {
-        cnSinCruce.forEach(m => items.push({
-          tipo: 'editable',
-          seccion: `${cuenta.emoji} ${cuenta.id} — Pagos CN sin cruce en programa (revisar concepto)`,
+        // 2. Movimientos SS sin recibo CI válido (no tienen No._CI-)
+        const sinCI = movsCuenta.filter(m =>
+          m.concepto === 'Seguridad Social' &&
+          (!m.recibo || (!m.recibo.toUpperCase().includes('CI-') && !m.recibo.toUpperCase().startsWith('NT ')))
+        );
+        sinCI.forEach(m => items.push({
+          seccion: `${cuenta.emoji} ${cuenta.id} — SS sin recibo identificado`,
+          sugerido: '',
           m
         }));
       }
 
-      // Movimientos Planillas Pagadas sin número de planilla
-      const sinNumPlanilla = movsCuenta.filter(m =>
-        m.concepto === 'Planillas Pagadas' && !m.numero_planilla && 
-        !(m.recibo && m.recibo.toUpperCase().startsWith('CN '))
-      );
-      if (sinNumPlanilla.length > 0) {
-        sinNumPlanilla.forEach(m => items.push({
-          tipo: 'editable',
-          seccion: `${cuenta.emoji} ${cuenta.id} — Planillas Pagadas sin N° de planilla asignado`,
-          m
-        }));
-      }
+      // 3. Movimientos sin concepto asignado
+      const sinConcepto = movsCuenta.filter(m => !m.concepto || m.concepto === 'Sin concepto');
+      sinConcepto.forEach(m => items.push({
+        seccion: `${cuenta.emoji} ${cuenta.id} — Sin concepto asignado`,
+        sugerido: '',
+        m
+      }));
     }
 
     if (items.length === 0) {
