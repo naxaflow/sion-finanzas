@@ -547,11 +547,11 @@
           delExcel.push({
             fecha, canal, descripcion, referencia, monto,
             tipo: monto >= 0 ? 'credito' : 'debito',
-            recibo:         r[7] ? String(r[7]).trim() : '',
-            concepto:       r[8] ? String(r[8]).trim() : '',
+            recibo:          r[7] ? String(r[7]).trim() : '',
+            concepto:        r[8] ? String(r[8]).trim() : '',
             numero_planilla: r[9] ? String(r[9]).trim() : '',
             fecha_orden: parsearFechaOrden(fecha),
-            cuenta
+            cuenta: r[10] ? String(r[10]).trim() : cuenta
           });
         }
 
@@ -727,7 +727,7 @@
         (m.numero_planilla ||'').toLowerCase().includes(buscar) ||
         (m.canal           ||'').toLowerCase().includes(buscar);
       return matchTipo && matchConcepto && matchBuscar;
-    });
+    }).sort((a, b) => (a.fecha_orden || '').localeCompare(b.fecha_orden || ''));
 
     document.getElementById('contadorFiltrado').textContent =
       filtrados.length === movimientos.length
@@ -843,22 +843,28 @@
   function generarPlantilla() {
     const data = [
       {
-        Fecha: '01-ene-26',
-        Canal: 'Bancolombia',
-        Descripción: 'Ejemplo descripción',
-        Referencia: '',
-        Tipo: 'Ingreso',
-        Monto: 100000,
-        Recibo: 'CI-000000',
-        Concepto: 'Seguridad Social',
-        'N° Planilla': '36432763'
+        Fecha: '01-feb-26', Canal: 'Bancolombia', Descripción: 'PAGO SEGURIDAD SOCIAL',
+        Referencia: '', Tipo: 'Ingreso', Monto: 500000,
+        Recibo: 'CI-000001', Concepto: 'Seguridad Social', 'N° Planilla': '36432763',
+        Cuenta: 'Banco SION'
+      },
+      {
+        Fecha: '05-feb-26', Canal: 'Daviplata', Descripción: 'TRANSFERENCIA HERNAN',
+        Referencia: '', Tipo: 'Egreso', Monto: -612000,
+        Recibo: '', Concepto: 'Hernan', 'N° Planilla': '',
+        Cuenta: 'Daviplata'
+      },
+      {
+        Fecha: '10-feb-26', Canal: 'Independientes', Descripción: 'PAGO SS INDEPENDIENTE',
+        Referencia: '', Tipo: 'Ingreso', Monto: 249000,
+        Recibo: 'CI-000002', Concepto: 'Seguridad Social', 'N° Planilla': '36758527',
+        Cuenta: 'Independientes'
       }
     ];
     const ws = XLSX.utils.json_to_sheet(data);
-    // Ancho de columnas
     ws['!cols'] = [
       {wch:12},{wch:14},{wch:35},{wch:20},{wch:10},
-      {wch:14},{wch:14},{wch:18},{wch:14}
+      {wch:14},{wch:14},{wch:18},{wch:14},{wch:16}
     ];
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Movimientos');
