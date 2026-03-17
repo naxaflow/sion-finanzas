@@ -402,7 +402,8 @@
       admonTotal += p.admon || 0;
       const b = bancoPorCuenta[c.id] || {};
       Object.entries(b).forEach(([concepto, val]) => {
-        if (concepto !== 'Planillas Pagadas' && val < 0) gastosTotal += val;
+        if (concepto !== 'Planillas Pagadas' && concepto !== '(sin concepto)' && val < 0)
+          gastosTotal += val;
       });
       saldosTotal += saldosIni[c.id] || 0;
     }
@@ -437,8 +438,8 @@
           </div>
           <hr class="divider">
           ${Object.entries(banco).filter(([,v])=>v>0).map(([k,v])=>{
-            const cid = cuenta.id, conc = k;
-            return '<div class="cuenta-row" style="cursor:pointer;" onclick="verDetalle(\'' + cid + '\',\'' + conc + '\')">'
+            const cid = cuenta.id;
+            return '<div class="cuenta-row ver-detalle-btn" style="cursor:pointer;" data-cuenta="' + cid + '" data-concepto="' + k + '">'
               + '<span class="label">↑ ' + k + '</span>'
               + '<span class="valor pos">' + formatCOP(v) + '</span>'
               + '<span style="font-size:0.7rem;color:var(--accent);margin-left:6px;">👁 Ver</span>'
@@ -446,8 +447,8 @@
           }).join('')}
           <hr class="divider">
           ${Object.entries(banco).filter(([,v])=>v<0).map(([k,v])=>{
-            const cid = cuenta.id, conc = k;
-            return '<div class="cuenta-row" style="cursor:pointer;" onclick="verDetalle(\'' + cid + '\',\'' + conc + '\')">'
+            const cid = cuenta.id;
+            return '<div class="cuenta-row ver-detalle-btn" style="cursor:pointer;" data-cuenta="' + cid + '" data-concepto="' + k + '">'
               + '<span class="label">↓ ' + k + '</span>'
               + '<span class="valor neg">' + formatCOP(v) + '</span>'
               + '<span style="font-size:0.7rem;color:var(--accent);margin-left:6px;">👁 Ver</span>'
@@ -483,7 +484,7 @@
     // Tarjeta resumen consolidado
     const cardResumen = document.createElement('div');
     cardResumen.className = 'cuenta-card';
-    const diferencia = admonTotal + gastosTotal;
+    const diferencia = admonTotal + gastosTotal; // gastosTotal ya es negativo
     cardResumen.innerHTML = `
       <div class="cuenta-header" style="background:#1e3a5f;">
         <span>📊 Resumen Consolidado</span>
@@ -491,18 +492,24 @@
       </div>
       <div class="cuenta-body">
         <div class="cuenta-row">
-          <span class="label">Admon esperada (3 cuentas)</span>
+          <span class="label">Admon esperada (programa)</span>
           <span class="valor pos">${formatCOP2(admonTotal)}</span>
+        </div>
+        <div class="cuenta-row" style="font-size:0.75rem;color:var(--muted);padding-top:2px;padding-bottom:6px;">
+          <span>= Total pagado − Seguridad Social (3 cuentas)</span>
         </div>
         <hr class="divider">
         <div class="cuenta-row">
-          <span class="label">Total gastos (sin planillas)</span>
+          <span class="label">Total gastos banco</span>
           <span class="valor neg">${formatCOP2(gastosTotal)}</span>
+        </div>
+        <div class="cuenta-row" style="font-size:0.75rem;color:var(--muted);padding-top:2px;padding-bottom:6px;">
+          <span>Egresos reales (excluye Planillas Pagadas)</span>
         </div>
         <hr class="divider">
         <div class="cuenta-row saldo-final">
           <span class="label">Diferencia</span>
-          <span class="valor ${diferencia>=0?'pos':'neg'}">${formatCOP2(diferencia)}</span>
+          <span class="valor ${diferencia>=0?'pos':'neg'}">${diferencia>=0?'✅ ':''} ${formatCOP2(diferencia)}</span>
         </div>
       </div>`;
     grid.appendChild(cardResumen);
@@ -788,6 +795,15 @@
     a.download = titulo.replace(/ — /g,'_').replace(/ /g,'_') + '.csv';
     a.click();
   }
+
+  // Delegación de eventos para botones 👁 Ver en las tarjetas
+  document.getElementById('cuentasGrid').addEventListener('click', function(e) {
+    const btn = e.target.closest('.ver-detalle-btn');
+    if (!btn) return;
+    const cuenta   = btn.getAttribute('data-cuenta');
+    const concepto = btn.getAttribute('data-concepto');
+    if (cuenta && concepto) verDetalle(cuenta, concepto);
+  });
 
   // Cerrar al hacer clic fuera del modal
   document.getElementById('detalleOverlay').addEventListener('click', function(e) {
