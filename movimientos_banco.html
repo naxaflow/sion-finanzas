@@ -265,11 +265,11 @@
             <th>Fecha</th>
             <th>Canal</th>
             <th>Descripción</th>
-            <th>Referencia</th>
+            <th>Ref.</th>
             <th>Tipo</th>
             <th>Monto</th>
             <th>Recibo</th>
-            <th>N° Planilla</th>
+            <th>Planilla</th>
             <th>Concepto</th>
             <th></th>
           </tr>
@@ -738,7 +738,7 @@
             onblur="guardarCampo('${m.id}','descripcion',this.value)">
           ${tieneMatch ? `<div style="font-size:0.7rem;color:var(--accent);margin-top:2px;">👤 ${prog.afiliado}</div>` : ''}
         </td>
-        <td><input class="input-tabla" value="${esc(m.referencia)}" style="min-width:90px;"
+        <td><input class="input-tabla" value="${esc(m.referencia)}" style="min-width:60px;max-width:80px;font-size:0.75rem;color:var(--muted);"
             onblur="guardarCampo('${m.id}','referencia',this.value)"></td>
         <td>
           <select class="input-tabla" style="width:85px;" onchange="cambiarTipo('${m.id}',this.value)">
@@ -755,14 +755,14 @@
         <td>
           <div class="recibo-wrap ${tieneMatch?'matched':''}" data-recibo-wrap="${m.id}">
             <input class="input-tabla" value="${esc(m.recibo)}" placeholder="CI-000000..."
-              style="min-width:110px;" 
+              style="min-width:160px;" 
               onblur="if(this.value.trim())onReciboBlur('${m.id}',this.value)"
               onkeydown="if(event.key==='Enter')this.blur()">
             <span class="autocomplete-hint">${tieneMatch ? '✓ '+prog.afiliado.split(' ')[0] : ''}</span>
           </div>
         </td>
-        <td><input class="input-tabla" value="${esc(m.numero_planilla)}" placeholder="N° planilla..."
-            data-planilla="${m.id}" style="min-width:100px;"
+        <td><input class="input-tabla" value="${esc(m.numero_planilla)}" placeholder="Planilla..."
+            data-planilla="${m.id}" style="min-width:90px;"
             onblur="if(this.value.trim()!==undefined)guardarCampo('${m.id}','numero_planilla',this.value)"
             onkeydown="if(event.key==='Enter')this.blur()"></td>
         <td>
