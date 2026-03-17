@@ -493,7 +493,7 @@
       <div class="cuenta-body">
         <div class="cuenta-row">
           <span class="label">Admon esperada (programa)</span>
-          <span class="valor pos">${formatCOP2(admonTotal)}</span>
+          <span class="valor pos">${formatCOP(admonTotal)}</span>
         </div>
         <div class="cuenta-row" style="font-size:0.75rem;color:var(--muted);padding-top:2px;padding-bottom:6px;">
           <span>= Total pagado − Seguridad Social (3 cuentas)</span>
@@ -501,7 +501,7 @@
         <hr class="divider">
         <div class="cuenta-row">
           <span class="label">Total gastos banco</span>
-          <span class="valor neg">${formatCOP2(gastosTotal)}</span>
+          <span class="valor neg">${formatCOP(gastosTotal)}</span>
         </div>
         <div class="cuenta-row" style="font-size:0.75rem;color:var(--muted);padding-top:2px;padding-bottom:6px;">
           <span>Egresos reales (excluye Planillas Pagadas)</span>
@@ -509,7 +509,7 @@
         <hr class="divider">
         <div class="cuenta-row saldo-final">
           <span class="label">Diferencia</span>
-          <span class="valor ${diferencia>=0?'pos':'neg'}">${diferencia>=0?'✅ ':''} ${formatCOP2(diferencia)}</span>
+          <span class="valor ${diferencia>=0?'pos':'neg'}">${diferencia>=0?'✅ ':''} ${formatCOP(diferencia)}</span>
         </div>
       </div>`;
     grid.appendChild(cardResumen);
@@ -760,9 +760,9 @@
     document.getElementById('detalleContador').textContent =
       `${movsFiltrados.length} movimiento${movsFiltrados.length !== 1 ? 's' : ''}`;
     document.getElementById('detalleTotal').textContent =
-      `Total: ${formatCOP2(total)}`;
+      `Total: ${formatCOP(total)}`;
     document.getElementById('detalleResumen').textContent =
-      `${movsFiltrados.length} registros · Total: ${formatCOP2(total)}`;
+      `${movsFiltrados.length} registros · Total: ${formatCOP(total)}`;
 
     document.getElementById('detalleBody').innerHTML = movsFiltrados.map(m => `
       <tr>
@@ -771,7 +771,7 @@
         <td style="font-size:0.75rem;color:var(--muted);">${m.recibo || '—'}</td>
         <td style="font-size:0.75rem;color:var(--muted);">${m.numero_planilla || '—'}</td>
         <td class="num" style="color:${Number(m.monto)>=0?'var(--credit)':'var(--debit)'}">
-          ${formatCOP2(Number(m.monto))}
+          ${formatCOP(Number(m.monto))}
         </td>
       </tr>`).join('');
 
@@ -814,7 +814,7 @@
     return new Intl.NumberFormat('es-CO',{style:'currency',currency:'COP',
       minimumFractionDigits:2,maximumFractionDigits:2}).format(n||0);
   }
-  function formatCOP2(n) {
+  function formatCOP(n) {
     return new Intl.NumberFormat('es-CO',{style:'currency',currency:'COP',
       minimumFractionDigits:2,maximumFractionDigits:2}).format(n||0);
   }
