@@ -476,8 +476,7 @@
     const prog = cachePrograma[recibo];
     if (!prog) return;
 
-    const mov = movimientos.find(m => m.id === id);
-    if (mov && (!mov.numero_planilla || mov.numero_planilla === '') && prog.planilla) {
+    const mov = movimientos.find(m => String(m.id) === String(id));
       await guardarCampo(id, 'numero_planilla', prog.planilla);
       const inputPlanilla = document.querySelector(`input[data-planilla="${id}"]`);
       if (inputPlanilla) inputPlanilla.value = prog.planilla;
@@ -663,8 +662,7 @@
 
   // ── Guardar campo ─────────────────────────────────────────
   async function guardarCampo(id, campo, valor) {
-    // Para recibo y planilla, no guardar si está vacío y ya tenía valor
-    const mov = movimientos.find(m => m.id === id);
+    const mov = movimientos.find(m => String(m.id) === String(id));
     if ((campo === 'recibo' || campo === 'numero_planilla') && 
         !valor.trim() && mov && mov[campo]) return;
 
@@ -675,14 +673,14 @@
     }
     const { error } = await sb.from('movimientos').update(update).eq('id', id);
     if (error) { mostrarToast('Error guardando', true); return; }
-    const idx = movimientos.findIndex(m => m.id === id);
+    const idx = movimientos.findIndex(m => String(m.id) === String(id));
     if (idx !== -1) Object.assign(movimientos[idx], update);
     actualizarResumen();
     if (campo !== 'monto') mostrarToast('✓ Guardado');
   }
 
   async function cambiarTipo(id, nuevoTipo) {
-    const mov = movimientos.find(m => m.id === id);
+    const mov = movimientos.find(m => String(m.id) === String(id));
     if (!mov) return;
     // Ajustar signo del monto según el tipo
     let monto = Math.abs(Number(mov.monto));
@@ -691,8 +689,9 @@
       .update({ tipo: nuevoTipo, monto })
       .eq('id', id);
     if (error) { mostrarToast('Error: ' + error.message, true); return; }
-    const idx = movimientos.findIndex(m => m.id === id);
+    const idx = movimientos.findIndex(m => String(m.id) === String(id));
     if (idx !== -1) { movimientos[idx].tipo = nuevoTipo; movimientos[idx].monto = monto; }
+    renderTabla();
     actualizarResumen();
     mostrarToast('✓ Tipo actualizado');
   }
