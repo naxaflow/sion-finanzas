@@ -477,6 +477,7 @@
     if (!prog) return;
 
     const mov = movimientos.find(m => String(m.id) === String(id));
+    if (mov && (!mov.numero_planilla || mov.numero_planilla === '') && prog.planilla) {
       await guardarCampo(id, 'numero_planilla', prog.planilla);
       const inputPlanilla = document.querySelector(`input[data-planilla="${id}"]`);
       if (inputPlanilla) inputPlanilla.value = prog.planilla;
