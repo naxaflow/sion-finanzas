@@ -404,21 +404,31 @@
       const banco = bancoPorCuenta[cuenta.id] || {};
       const prog_c = progPorCuenta[cuenta.id] || { segSocial: 0, admon: 0 };
 
+      // Banco: Seguridad Social = ingresos con ese concepto
+      //        Planillas Pagadas = egresos de planillas
+      // Programa: total = lo que pagaron afiliados
+      //           total_ss = lo que va a SS
+      //           admon = total - total_ss
+      const ssBancoIngreso   = banco['Seguridad Social'] || 0;
+      const planillasBanco   = Math.abs(banco['Planillas Pagadas'] || 0);
       const comparaciones = [
         { 
-          concepto: 'Total programa (col Total)', 
-          banco: banco['Seguridad Social']||0, 
-          prog: prog_c.total 
+          concepto: 'Ingresos SS (banco vs programa)', 
+          banco: ssBancoIngreso, 
+          prog: prog_c.total,
+          nota: 'Diferencia = pagos pendientes de registrar'
         },
         { 
-          concepto: 'Total SS (EPS+ARL+AFP+CCF+FSP)', 
-          banco: banco['Seguridad Social']||0, 
-          prog: prog_c.totalSS 
+          concepto: 'Planillas pagadas (banco) vs SS por pagar (programa)', 
+          banco: planillasBanco, 
+          prog: prog_c.totalSS,
+          nota: 'Diferencia = planillas pendientes de pago'
         },
         { 
-          concepto: 'Admon esperada (Total - Total SS)', 
-          banco: 0, 
-          prog: prog_c.admon 
+          concepto: 'Admon esperada (Total - SS programa)', 
+          banco: ssBancoIngreso - prog_c.totalSS, 
+          prog: prog_c.admon,
+          nota: 'Lo que queda para la empresa'
         },
       ];
 
@@ -428,11 +438,11 @@
         const tr = document.createElement('tr');
         tr.innerHTML = `
           <td><strong>${cuenta.emoji} ${cuenta.id}</strong></td>
-          <td>${comp.concepto}</td>
+          <td>${comp.concepto}<br><small style="color:var(--muted);font-size:0.75rem;">${comp.nota||''}</small></td>
           <td class="num pos">${formatCOP(comp.banco)}</td>
           <td class="num pos">${formatCOP(comp.prog)}</td>
-          <td class="num ${ok?'diff-ok':'diff-err'}">${ok ? '—' : formatCOP(diff)}</td>
-          <td><span class="badge ${ok?'badge-ok':'badge-err'}">${ok?'✅ Cuadra':'⚠️ Diferencia'}</span></td>`;
+          <td class="num ${ok?'diff-ok':'diff-err'}">${ok ? '✅ —' : '⚠️ '+formatCOP(diff)}</td>
+          <td><span class="badge ${ok?'badge-ok':'badge-err'}">${ok?'Cuadra':'Diferencia'}</span></td>`;
         tbody.appendChild(tr);
       }
 
