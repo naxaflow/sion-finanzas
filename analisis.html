@@ -135,6 +135,25 @@
   .diff-item .di-save { background: var(--accent); color: white; border: none; border-radius: 5px; padding: 4px 10px; font-size: 0.78rem; cursor: pointer; }
   .diff-item .di-save:hover { opacity: 0.85; }
 
+  /* Panel detalle por concepto */
+  .detalle-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:2000; align-items:center; justify-content:center; }
+  .detalle-overlay.show { display:flex; }
+  .detalle-modal { background:white; border-radius:12px; width:92%; max-width:900px; max-height:85vh; display:flex; flex-direction:column; box-shadow:0 20px 60px rgba(0,0,0,0.3); }
+  .detalle-modal-header { padding:18px 24px; background:var(--header-bg); color:white; border-radius:12px 12px 0 0; display:flex; justify-content:space-between; align-items:center; }
+  .detalle-modal-header h3 { font-size:1rem; font-weight:700; }
+  .detalle-modal-header button { background:none; border:none; color:white; font-size:1.2rem; cursor:pointer; opacity:0.8; }
+  .detalle-modal-header button:hover { opacity:1; }
+  .detalle-modal-actions { padding:12px 24px; border-bottom:1px solid var(--border); display:flex; gap:10px; align-items:center; }
+  .detalle-modal-body { overflow-y:auto; flex:1; }
+  .detalle-modal-body table { width:100%; border-collapse:collapse; font-size:0.82rem; }
+  .detalle-modal-body thead th { background:#f8fafc; padding:9px 14px; text-align:left; font-size:0.7rem; font-weight:700; text-transform:uppercase; color:var(--muted); border-bottom:1px solid var(--border); }
+  .detalle-modal-body thead th.num { text-align:right; }
+  .detalle-modal-body tbody tr { border-bottom:1px solid #f1f3f5; }
+  .detalle-modal-body tbody tr:hover { background:#f8fafb; }
+  .detalle-modal-body tbody td { padding:8px 14px; }
+  .detalle-modal-body tbody td.num { text-align:right; font-weight:600; }
+  .detalle-modal-footer { padding:14px 24px; border-top:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; font-size:0.85rem; color:var(--muted); }
+
   footer { text-align: center; padding: 24px; color: var(--muted); font-size: 0.8rem; }
 </style>
 </head>
@@ -237,6 +256,38 @@
     </div>
     <div id="diffList"></div>
   </div>
+
+<!-- Modal detalle por concepto -->
+<div class="detalle-overlay" id="detalleOverlay">
+  <div class="detalle-modal">
+    <div class="detalle-modal-header">
+      <h3 id="detalleTitulo">Detalle</h3>
+      <button onclick="cerrarDetalle()">✕</button>
+    </div>
+    <div class="detalle-modal-actions">
+      <button class="btn btn-excel" onclick="exportarDetalle()">⬇ Exportar Excel</button>
+      <span id="detalleResumen" style="font-size:0.83rem;color:var(--muted);"></span>
+    </div>
+    <div class="detalle-modal-body">
+      <table>
+        <thead>
+          <tr>
+            <th>Fecha</th>
+            <th>Descripción</th>
+            <th>Recibo</th>
+            <th>N° Planilla</th>
+            <th class="num">Monto</th>
+          </tr>
+        </thead>
+        <tbody id="detalleBody"></tbody>
+      </table>
+    </div>
+    <div class="detalle-modal-footer">
+      <span id="detalleContador"></span>
+      <span id="detalleTotal" style="font-weight:700;"></span>
+    </div>
+  </div>
+</div>
 
 <footer>SION ERP • Sistema financiero</footer>
 <div class="toast" id="toast"></div>
@@ -374,15 +425,17 @@
           </div>
           <hr class="divider">
           ${Object.entries(banco).filter(([,v])=>v>0).map(([k,v])=>`
-          <div class="cuenta-row">
+          <div class="cuenta-row" style="cursor:pointer;" onclick="verDetalle('${cuenta.id}','${k}')">
             <span class="label">↑ ${k}</span>
             <span class="valor pos">${formatCOP(v)}</span>
+            <span style="font-size:0.7rem;color:var(--accent);margin-left:6px;">👁 Ver</span>
           </div>`).join('')}
           <hr class="divider">
           ${Object.entries(banco).filter(([,v])=>v<0).map(([k,v])=>`
-          <div class="cuenta-row">
+          <div class="cuenta-row" style="cursor:pointer;" onclick="verDetalle('${cuenta.id}','${k}')">
             <span class="label">↓ ${k}</span>
             <span class="valor neg">${formatCOP(v)}</span>
+            <span style="font-size:0.7rem;color:var(--accent);margin-left:6px;">👁 Ver</span>
           </div>`).join('')}
           <hr class="divider">
           <div class="cuenta-row saldo-final">
@@ -639,6 +692,64 @@
     mostrarToast('✓ Concepto actualizado — regenerando análisis...');
     setTimeout(() => renderAnalisis(), 500);
   }
+
+  let detalleActual = [];
+
+  function verDetalle(cuentaId, concepto) {
+    const movsFiltrados = (datosAnalisis.movs || [])
+      .filter(m => m.cuenta === cuentaId && m.concepto === concepto)
+      .sort((a, b) => (a.fecha_orden || '').localeCompare(b.fecha_orden || ''));
+
+    detalleActual = movsFiltrados;
+    const total = movsFiltrados.reduce((s, m) => s + Number(m.monto), 0);
+    const mes   = datosAnalisis.mes;
+    const anio  = datosAnalisis.anio;
+
+    document.getElementById('detalleTitulo').textContent =
+      `${cuentaId} — ${concepto} — ${MESES_NOMBRE[parseInt(mes)]} ${anio}`;
+    document.getElementById('detalleContador').textContent =
+      `${movsFiltrados.length} movimiento${movsFiltrados.length !== 1 ? 's' : ''}`;
+    document.getElementById('detalleTotal').textContent =
+      `Total: ${formatCOP2(total)}`;
+    document.getElementById('detalleResumen').textContent =
+      `${movsFiltrados.length} registros · Total: ${formatCOP2(total)}`;
+
+    document.getElementById('detalleBody').innerHTML = movsFiltrados.map(m => `
+      <tr>
+        <td>${m.fecha}</td>
+        <td>${m.descripcion || ''}</td>
+        <td style="font-size:0.75rem;color:var(--muted);">${m.recibo || '—'}</td>
+        <td style="font-size:0.75rem;color:var(--muted);">${m.numero_planilla || '—'}</td>
+        <td class="num" style="color:${Number(m.monto)>=0?'var(--credit)':'var(--debit)'}">
+          ${formatCOP2(Number(m.monto))}
+        </td>
+      </tr>`).join('');
+
+    document.getElementById('detalleOverlay').classList.add('show');
+  }
+
+  function cerrarDetalle() {
+    document.getElementById('detalleOverlay').classList.remove('show');
+  }
+
+  function exportarDetalle() {
+    if (!detalleActual.length) return;
+    const titulo = document.getElementById('detalleTitulo').textContent;
+    let csv = 'Fecha,Descripción,Recibo,N° Planilla,Monto\n';
+    detalleActual.forEach(m => {
+      csv += `"${m.fecha}","${m.descripcion||''}","${m.recibo||''}","${m.numero_planilla||''}",${m.monto}\n`;
+    });
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = titulo.replace(/ — /g,'_').replace(/ /g,'_') + '.csv';
+    a.click();
+  }
+
+  // Cerrar al hacer clic fuera del modal
+  document.getElementById('detalleOverlay').addEventListener('click', function(e) {
+    if (e.target === this) cerrarDetalle();
+  });
 
   function formatCOP(n) {
     return new Intl.NumberFormat('es-CO',{style:'currency',currency:'COP',
