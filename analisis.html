@@ -250,7 +250,7 @@
     // 2. Ingreso programa
     const { data: prog, error: e2 } = await sb
       .from('ingreso_programa').select('banco, detalle, total, total_ss, admon, planilla')
-      .eq('mes', mes).eq('anio', anio);
+      .eq('mes', mes).eq('anio', parseInt(anio));
     if (e2) { mostrarToast('Error cargando programa', true); return; }
 
     // 3. Saldos iniciales
@@ -293,14 +293,21 @@
       bancoPorCuenta[m.cuenta][c] = (bancoPorCuenta[m.cuenta][c] || 0) + Number(m.monto);
     }
 
-    // Agrupar programa por banco + tipo (detalle)
+    // Agrupar programa por banco
+    // Total = col AC (total pagado por afiliado)
+    // Total SS = EPS + ARL + AFP + CCF + FSP (verificación interna)
+    // Admon esperada = Total - Total SS
     const progPorCuenta = {};
     for (const p of prog) {
       const banco = p.banco || '';
-      const cuenta = CUENTAS.find(c => banco.includes(c.progBanco.split(' ')[0]))?.id || banco;
-      if (!progPorCuenta[cuenta]) progPorCuenta[cuenta] = { segSocial: 0, admon: 0, count: 0 };
-      progPorCuenta[cuenta].segSocial += Number(p.total_ss) || 0;
-      progPorCuenta[cuenta].admon     += Number(p.admon) || 0;
+      const cuenta = CUENTAS.find(c => banco.toUpperCase().includes(c.progBanco.split(' ')[0]))?.id || banco;
+      if (!progPorCuenta[cuenta]) progPorCuenta[cuenta] = { total: 0, totalSS: 0, admon: 0, count: 0 };
+      const total   = Number(p.total)    || 0;
+      const totalSS = Number(p.total_ss) || 0;
+      const admon   = total - totalSS;
+      progPorCuenta[cuenta].total   += total;
+      progPorCuenta[cuenta].totalSS += totalSS;
+      progPorCuenta[cuenta].admon   += admon;
       progPorCuenta[cuenta].count++;
     }
 
@@ -321,7 +328,7 @@
 
       // Seguridad Social banco vs programa
       const ssBanco = banco['Seguridad Social'] || 0;
-      const ssProg  = prog_c.segSocial;
+      const ssProg  = prog_c.total;  // Total col AC = suma de todos los pagos
       const ssDiff  = ssBanco - ssProg;
 
       const card = document.createElement('div');
@@ -356,15 +363,19 @@
           <hr class="divider" style="margin-top:12px;">
           <div style="font-size:0.75rem;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:6px;">vs Programa</div>
           <div class="cuenta-row">
-            <span class="label">SS banco</span>
+            <span class="label">Total banco (SS)</span>
             <span class="valor pos">${formatCOP(ssBanco)}</span>
           </div>
           <div class="cuenta-row">
-            <span class="label">SS programa (${prog_c.count} pagos)</span>
+            <span class="label">Total programa (${prog_c.count} pagos)</span>
             <span class="valor pos">${formatCOP(ssProg)}</span>
           </div>
           <div class="cuenta-row">
-            <span class="label">Diferencia SS</span>
+            <span class="label">Admon esperada</span>
+            <span class="valor">${formatCOP(prog_c.admon)}</span>
+          </div>
+          <div class="cuenta-row">
+            <span class="label">Diferencia</span>
             <span class="valor ${Math.abs(ssDiff)<1?'diff-ok':'diff-err'}">${Math.abs(ssDiff)<1?'✅ Cuadra':'⚠️ '+formatCOP(ssDiff)}</span>
           </div>
         </div>`;
@@ -392,8 +403,21 @@
       const prog_c = progPorCuenta[cuenta.id] || { segSocial: 0, admon: 0 };
 
       const comparaciones = [
-        { concepto: 'Seguridad Social (ingresos)', banco: banco['Seguridad Social']||0, prog: prog_c.segSocial },
-        { concepto: 'Admon esperada', banco: banco['Seguridad Social']? (banco['Seguridad Social'] - prog_c.segSocial + prog_c.admon) : 0, prog: prog_c.admon },
+        { 
+          concepto: 'Total programa (col Total)', 
+          banco: banco['Seguridad Social']||0, 
+          prog: prog_c.total 
+        },
+        { 
+          concepto: 'Total SS (EPS+ARL+AFP+CCF+FSP)', 
+          banco: banco['Seguridad Social']||0, 
+          prog: prog_c.totalSS 
+        },
+        { 
+          concepto: 'Admon esperada (Total - Total SS)', 
+          banco: 0, 
+          prog: prog_c.admon 
+        },
       ];
 
       for (const comp of comparaciones) {
@@ -458,4 +482,3 @@
 </script>
 </body>
 </html>
-
