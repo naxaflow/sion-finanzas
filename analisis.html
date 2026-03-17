@@ -539,6 +539,7 @@
 
       // Cruce por número de planilla:
       // Banco: movimientos con numero_planilla vs programa: planilla
+      const movsCuenta = (datosAnalisis.movs || []).filter(m => m.cuenta === cuenta.id);
       const plansBanco = new Set(
         movsCuenta.filter(m => m.concepto === 'Planillas Pagadas' && m.numero_planilla)
                   .map(m => String(m.numero_planilla).trim())
