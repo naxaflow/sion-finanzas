@@ -520,39 +520,39 @@
     const items = [];
 
     for (const cuenta of CUENTAS) {
-      const banco  = {};
-      movsBanco.filter(m => m.cuenta === cuenta.id).forEach(m => {
+      const movsCuenta = movsBanco.filter(m => m.cuenta === cuenta.id);
+      const banco = {};
+      movsCuenta.forEach(m => {
         const c = m.concepto || '(sin concepto)';
         banco[c] = (banco[c] || 0) + Number(m.monto);
       });
 
-      const prog_c = progPorCuenta[cuenta.id] || { total: 0, totalSS: 0, admon: 0 };
-      const ssBanco      = banco['Seguridad Social'] || 0;
-      const planBanco    = Math.abs(banco['Planillas Pagadas'] || 0);
-      const diffSS       = ssBanco - prog_c.total;
-      const diffPlan     = planBanco - prog_c.totalSS;
+      const prog_c    = progPorCuenta[cuenta.id] || { total: 0, totalSS: 0, admon: 0 };
+      const ssBanco   = banco['Seguridad Social'] || 0;
+      const planBanco = Math.abs(banco['Planillas Pagadas'] || 0);
+      const diffSS    = ssBanco - prog_c.total;
+      const diffPlan  = planBanco - prog_c.totalSS;
 
-      // Diferencia SS — movimientos sin cruce real
+      // Diferencia SS — movimientos sin cruce (sin recibo CI válido o con nota NT/ERRADO)
       if (Math.abs(diffSS) >= 1) {
-        // Mostrar movimientos SS sin recibo CI o con nota NT/ERRADO
-        const sinCruce = movsBanco.filter(m =>
-          m.cuenta === cuenta.id &&
+        const sinCruce = movsCuenta.filter(m =>
           m.concepto === 'Seguridad Social' &&
-          (!m.recibo || m.recibo.toUpperCase().includes('NT ') || m.recibo.toUpperCase().includes('ERRADO') || m.recibo.toUpperCase().includes('ERROR'))
+          (!m.recibo || m.recibo.toUpperCase().includes('NT ') ||
+           m.recibo.toUpperCase().includes('ERRADO') || m.recibo.toUpperCase().includes('ERROR'))
         );
-        sinCruce.forEach(m => items.push({ tipo: 'SS sin cruce', cuenta: cuenta.id, emoji: cuenta.emoji, m }));
+        sinCruce.forEach(m => items.push({ tipo: 'editable', seccion: `${cuenta.emoji} ${cuenta.id} — SS sin cruce`, m }));
       }
 
-      // Diferencia Planillas — informativa
+      // Diferencia Planillas — mostrar movimientos de Planillas Pagadas
       if (Math.abs(diffPlan) >= 1) {
-        items.push({
-          tipo: 'info',
-          cuenta: cuenta.id,
-          emoji: cuenta.emoji,
-          texto: diffPlan > 0
-            ? `Hay $${Math.abs(diffPlan).toLocaleString('es-CO')} más pagado en banco que en programa — verificar si hay planillas no registradas`
-            : `Hay $${Math.abs(diffPlan).toLocaleString('es-CO')} pendiente de pago en banco según el programa`
-        });
+        const planMovs = movsCuenta.filter(m => m.concepto === 'Planillas Pagadas');
+        if (planMovs.length > 0) {
+          planMovs.forEach(m => items.push({ tipo: 'editable', seccion: `${cuenta.emoji} ${cuenta.id} — Planillas Pagadas (diferencia $${Math.abs(diffPlan).toLocaleString('es-CO')})`, m }));
+        } else {
+          // No hay movimientos de planillas en banco — mostrar los SS sin planilla asignada
+          const sinPlan = movsCuenta.filter(m => m.concepto === 'Seguridad Social' && !m.numero_planilla);
+          sinPlan.forEach(m => items.push({ tipo: 'editable', seccion: `${cuenta.emoji} ${cuenta.id} — Sin planilla asignada (diferencia $${Math.abs(diffPlan).toLocaleString('es-CO')})`, m }));
+        }
       }
     }
 
@@ -562,17 +562,22 @@
     }
 
     document.getElementById('diffPanel').style.display = 'block';
-    document.getElementById('diffCount').textContent = `${items.length} items para revisar`;
+    document.getElementById('diffCount').textContent = `${items.length} movimientos para revisar`;
 
-    list.innerHTML = items.map(item => {
-      if (item.tipo === 'info') return `
-        <div class="diff-item" style="background:#eff6ff;">
-          <span class="di-fecha">${item.emoji} ${item.cuenta}</span>
-          <span class="di-desc" style="color:#1d4ed8;font-weight:600;">ℹ️ ${item.texto}</span>
-        </div>`;
+    // Agrupar por sección
+    const secciones = {};
+    items.forEach(item => {
+      if (!secciones[item.seccion]) secciones[item.seccion] = [];
+      secciones[item.seccion].push(item);
+    });
 
-      const m = item.m;
-      return `
+    list.innerHTML = Object.entries(secciones).map(([seccion, grupo]) => `
+      <div style="background:#f8fafc;padding:8px 18px;font-size:0.78rem;font-weight:700;color:var(--warning);border-bottom:1px solid #fcd34d;">
+        ${seccion}
+      </div>
+      ${grupo.map(item => {
+        const m = item.m;
+        return `
         <div class="diff-item">
           <span class="di-fecha">${m.fecha}</span>
           <span class="di-desc">${m.descripcion}</span>
@@ -583,7 +588,8 @@
           </select>
           <button class="di-save" onclick="guardarConceptoDiff('${m.id}')">💾 Guardar</button>
         </div>`;
-    }).join('');
+      }).join('')}
+    `).join('');
   }
 
   async function guardarConceptoDiff(id) {
