@@ -231,8 +231,8 @@
     <label>Tipo:</label>
     <select id="filtroTipo" onchange="renderTabla()">
       <option value="">Todos</option>
-      <option value="credito">Solo ingresos</option>
-      <option value="debito">Solo egresos</option>
+      <option value="pos">Solo ingresos (+)</option>
+      <option value="neg">Solo egresos (-)</option>
     </select>
     <label>Concepto:</label>
     <select id="filtroConcepto" onchange="renderTabla()">
@@ -267,8 +267,7 @@
           <col style="width:70px">
           <col style="width:160px">
           <col style="width:55px">
-          <col style="width:80px">
-          <col style="width:105px">
+          <col style="width:115px">
           <col style="width:220px">
           <col style="width:75px">
           <col style="width:130px">
@@ -281,7 +280,6 @@
             <th>Canal</th>
             <th>Descripción</th>
             <th>Ref.</th>
-            <th>Tipo</th>
             <th>Monto</th>
             <th>Recibo</th>
             <th>No.</th>
@@ -392,6 +390,18 @@
 
     if (error) { mostrarToast('Error: ' + error.message, true); return; }
     movimientos = data || [];
+
+    // Corregir signos inconsistentes: debito debe ser negativo, credito positivo
+    const aCorregir = movimientos.filter(m =>
+      (m.tipo === 'debito'  && Number(m.monto) > 0) ||
+      (m.tipo === 'credito' && Number(m.monto) < 0)
+    );
+    for (const m of aCorregir) {
+      const montoCorr = m.tipo === 'debito' ? -Math.abs(Number(m.monto)) : Math.abs(Number(m.monto));
+      await sb.from('movimientos').update({ monto: montoCorr }).eq('id', m.id);
+      m.monto = montoCorr;
+    }
+    if (aCorregir.length > 0) mostrarToast(`✓ ${aCorregir.length} montos corregidos automáticamente`);
 
     // Cargar saldo inicial del mes anterior
     await cargarSaldoInicial(cuenta, mes, anio);
@@ -664,18 +674,24 @@
   // ── Guardar campo ─────────────────────────────────────────
   async function guardarCampo(id, campo, valor) {
     const mov = movimientos.find(m => String(m.id) === String(id));
-    if ((campo === 'recibo' || campo === 'numero_planilla') && 
+    if ((campo === 'recibo' || campo === 'numero_planilla') &&
         !valor.trim() && mov && mov[campo]) return;
 
     const update = { [campo]: valor };
     if (campo === 'monto') {
       const num = parsearMontoManual(valor);
-      update.monto = num; update.tipo = num >= 0 ? 'credito' : 'debito';
+      update.monto = num;
+      update.tipo  = num >= 0 ? 'credito' : 'debito';
+    }
+    if (campo === 'fecha') {
+      const fo = parsearFechaOrden(valor);
+      if (fo) update.fecha_orden = fo;
     }
     const { error } = await sb.from('movimientos').update(update).eq('id', id);
     if (error) { mostrarToast('Error guardando', true); return; }
     const idx = movimientos.findIndex(m => String(m.id) === String(id));
     if (idx !== -1) Object.assign(movimientos[idx], update);
+    if (campo === 'monto' || campo === 'fecha') renderTabla();
     actualizarResumen();
     if (campo !== 'monto') mostrarToast('✓ Guardado');
   }
@@ -718,7 +734,9 @@
     const buscar   = document.getElementById('filtroBuscar').value.toLowerCase();
 
     const filtrados = movimientos.filter(m => {
-      const matchTipo     = !tipo     || m.tipo === tipo;
+      const matchTipo     = !tipo ||
+        (tipo === 'pos' && Number(m.monto) >= 0) ||
+        (tipo === 'neg' && Number(m.monto) < 0);
       const matchConcepto = !concepto || m.concepto === concepto;
       const matchBuscar   = !buscar   ||
         (m.descripcion     ||'').toLowerCase().includes(buscar) ||
@@ -758,15 +776,10 @@
         <td><input class="input-tabla" value="${esc(m.referencia)}" style="width:100%;font-size:0.72rem;color:var(--muted);"
             onblur="guardarCampo('${m.id}','referencia',this.value)"></td>
         <td>
-          <select class="input-tabla" style="width:100%;" onchange="cambiarTipo('${m.id}',this.value)">
-            <option value="credito" ${m.tipo==='credito'?'selected':''}>Ingreso</option>
-            <option value="debito"  ${m.tipo==='debito' ?'selected':''}>Egreso</option>
-          </select>
-        </td>
-        <td>
           <input class="input-tabla" value="${formatMontoRaw(m.monto)}"
-            style="width:100%;text-align:right;color:${m.tipo==='debito'?'var(--debit)':'var(--credit)'};font-weight:600;"
-            onblur="guardarCampo('${m.id}','monto',this.value)">
+            style="width:100%;text-align:right;color:${Number(m.monto)<0?'var(--debit)':'var(--credit)'};font-weight:600;"
+            onblur="guardarCampo('${m.id}','monto',this.value)"
+            onkeydown="if(event.key==='Enter')this.blur()">
           ${tieneMatch ? `<div style="font-size:0.68rem;color:var(--muted);">Prog: ${formatMontoRaw(prog.total)}</div>` : ''}
         </td>
         <td>
@@ -798,8 +811,8 @@
   let saldoFinalCalculado = 0;
 
   function actualizarResumen() {
-    const creds = movimientos.filter(m=>m.tipo==='credito').reduce((s,m)=>s+Number(m.monto),0);
-    const debs  = movimientos.filter(m=>m.tipo==='debito' ).reduce((s,m)=>s+Number(m.monto),0);
+    const creds = movimientos.filter(m=>Number(m.monto)>=0).reduce((s,m)=>s+Number(m.monto),0);
+    const debs  = movimientos.filter(m=>Number(m.monto)< 0).reduce((s,m)=>s+Number(m.monto),0);
     saldoFinalCalculado = saldoInicialMes + creds + debs;
 
     document.getElementById('statTotal').textContent         = movimientos.length;
