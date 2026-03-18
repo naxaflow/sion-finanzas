@@ -587,46 +587,51 @@
 
         const delExcel = [];
         let filasInvalidas = 0;
+
+        // Encontrar fila de encabezados (la que tiene 'Fecha' en col 0)
+        let dataStart = 0;
         for (let i = 0; i < rows.length; i++) {
           const r = rows[i];
-          if (!r || r.length < 7) continue;
+          if (r && r[0] && String(r[0]).toLowerCase().trim() === 'fecha') {
+            dataStart = i + 1;
+            break;
+          }
+        }
 
-          const fechaRaw    = r[0] instanceof Date
+        for (let i = dataStart; i < rows.length; i++) {
+          const r = rows[i];
+          if (!r) continue;
+
+          // Fecha (col 0) — puede ser Date object o string
+          const fechaRaw = r[0] instanceof Date
             ? `${r[0].getFullYear()}-${String(r[0].getMonth()+1).padStart(2,'0')}-${String(r[0].getDate()).padStart(2,'0')}`
             : (r[0] ? String(r[0]).trim() : '');
-          const canal       = r[1] ? String(r[1]).trim() : 'Bancolombia';
-          const descripcion = r[2] ? String(r[2]).trim() : '';
-          const ref1        = r[3] && String(r[3]).trim() !== '- -' ? String(r[3]).trim() : '';
-          const ref2        = r[4] && String(r[4]).trim() !== '- -' ? String(r[4]).trim() : '';
-          const referencia  = [ref1, ref2].filter(Boolean).join(' / ');
-          const monto       = parsearMonto(r[6]);
 
-          if (!fechaRaw || fechaRaw.toUpperCase() === 'FECHA') continue;
-          if (!descripcion) continue;
-          if (monto === 0) continue;
+          if (!fechaRaw) continue;
 
           const fecha_orden = parsearFechaOrden(fechaRaw);
           if (!fecha_orden) { filasInvalidas++; continue; }
-          const fecha = fechaISOaDisplay(fecha_orden);
 
-          // Detectar si la plantilla tiene columna Tipo (formato viejo, 10 cols)
-          // o no la tiene (formato nuevo, 9 cols): ajustar índices
-          const tieneTipo = r.length >= 9 && (String(r[4]).toLowerCase() === 'ingreso' || String(r[4]).toLowerCase() === 'egreso');
-          const idxMonto   = tieneTipo ? 5 : 4;
-          const idxRecibo  = tieneTipo ? 6 : 5;  // pero ya leímos monto de r[6] arriba... ajustar
-          const montoFinal = tieneTipo ? parsearMonto(r[5]) : monto;
+          const canal       = r[1] ? String(r[1]).trim() : 'Manual';
+          const descripcion = r[2] ? String(r[2]).trim() : '';
+          const referencia  = r[3] ? String(r[3]).trim() : '';
+          const monto       = parsearMonto(String(r[4] ?? ''));
+          const recibo      = r[5] ? String(r[5]).trim() : '';
+          const concepto    = r[6] ? String(r[6]).trim() : '';
+          const planilla    = r[7] ? String(r[7]).trim() : '';
+          const cuentaFila  = r[8] ? String(r[8]).trim() : cuenta;
 
-          // Guardar recibo completo tal como viene
-          const reciboLimpio = r[idxRecibo] ? String(r[idxRecibo]).trim() : '';
+          if (!descripcion) continue;
+          if (monto === 0) continue;
 
           delExcel.push({
-            fecha, canal, descripcion, referencia, monto: montoFinal,
-            tipo: montoFinal >= 0 ? 'credito' : 'debito',
-            recibo:          reciboLimpio,
-            concepto:        r[idxRecibo+1] ? String(r[idxRecibo+1]).trim() : '',
-            numero_planilla: r[idxRecibo+2] ? String(r[idxRecibo+2]).trim() : '',
+            fecha: fechaISOaDisplay(fecha_orden),
+            canal, descripcion, referencia, monto,
+            tipo: monto >= 0 ? 'credito' : 'debito',
+            recibo, concepto,
+            numero_planilla: planilla,
             fecha_orden,
-            cuenta: r[idxRecibo+3] ? String(r[idxRecibo+3]).trim() : cuenta
+            cuenta: cuentaFila
           });
         }
 
@@ -945,34 +950,39 @@
   // ── Generar plantilla vacía ───────────────────────────────
   function generarPlantilla() {
     const instrucciones = [{
-      Fecha: '⚠️ Usar formato dd/mm/aaaa en columna Fecha. Ej: 17/03/2026',
+      Fecha: '⚠️ Fecha: dd/mm/aaaa (ej: 17/03/2026) | Monto: positivo=ingreso, negativo=egreso | Cuenta: Banco SION | Daviplata | Independientes',
       Canal: '', Descripción: '', Referencia: '', Monto: '',
       Recibo: '', Concepto: '', 'N° Planilla': '', Cuenta: ''
     }];
     const data = [
       {
-        Fecha: '01/02/2026', Canal: 'Bancolombia', Descripción: 'PAGO SEGURIDAD SOCIAL',
-        Referencia: '', Monto: 500000,
-        Recibo: 'CI-000001', Concepto: 'Seguridad Social', 'N° Planilla': '36432763',
+        Fecha: '17/03/2026', Canal: 'Bancolombia',
+        Descripción: 'TRANSFERENCIA NEQUI BANCOLOMBIA',
+        Referencia: '', Monto: 255000,
+        Recibo: '17 - Mar No._CI-00000021772-REGULO_VARGAS_GARZON-255000',
+        Concepto: 'Seguridad Social', 'N° Planilla': '36432763',
         Cuenta: 'Banco SION'
       },
       {
-        Fecha: '05/02/2026', Canal: 'Daviplata', Descripción: 'TRANSFERENCIA HERNAN',
+        Fecha: '17/03/2026', Canal: 'Bancolombia',
+        Descripción: 'TRANSFERENCIA CTA SUC VIRTUAL',
+        Referencia: '', Monto: 212300,
+        Recibo: '17 - Mar No._CI-00000021771-HARVEY_ALONSO_GUEVARA_COLLAZOS-212300',
+        Concepto: 'Seguridad Social', 'N° Planilla': '36758527',
+        Cuenta: 'Banco SION'
+      },
+      {
+        Fecha: '05/03/2026', Canal: 'Daviplata',
+        Descripción: 'TRANSFERENCIA HERNAN',
         Referencia: '', Monto: -612000,
         Recibo: '', Concepto: 'Hernan', 'N° Planilla': '',
         Cuenta: 'Daviplata'
-      },
-      {
-        Fecha: '10/02/2026', Canal: 'Independientes', Descripción: 'PAGO SS INDEPENDIENTE',
-        Referencia: '', Monto: 249000,
-        Recibo: 'CI-000002', Concepto: 'Seguridad Social', 'N° Planilla': '36758527',
-        Cuenta: 'Independientes'
       }
     ];
     const ws = XLSX.utils.json_to_sheet([...instrucciones, ...data]);
     ws['!cols'] = [
-      {wch:14},{wch:14},{wch:35},{wch:20},{wch:14},
-      {wch:14},{wch:18},{wch:14},{wch:16}
+      {wch:14},{wch:14},{wch:35},{wch:16},{wch:12},
+      {wch:60},{wch:18},{wch:14},{wch:16}
     ];
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Movimientos');
