@@ -96,7 +96,11 @@
     background: #f8fafc; padding: 10px 10px; text-align: left;
     font-size: 0.7rem; font-weight: 600; text-transform: uppercase;
     letter-spacing: 0.04em; color: var(--muted); border-bottom: 1px solid var(--border); white-space: nowrap;
+    cursor: pointer; user-select: none;
   }
+  thead th:hover { background: #eef2f7; color: var(--text); }
+  thead th.sort-asc::after  { content: ' ↑'; color: var(--accent); }
+  thead th.sort-desc::after { content: ' ↓'; color: var(--accent); }
   tbody tr { border-bottom: 1px solid #f1f3f5; transition: background 0.1s; }
   tbody tr:hover { background: #f8fafb; }
   tbody td { padding: 7px 10px; vertical-align: middle; }
@@ -276,14 +280,14 @@
         <thead>
           <tr>
             <th>#</th>
-            <th>Fecha</th>
-            <th>Canal</th>
-            <th>Descripción</th>
+            <th onclick="sortBy('fecha_orden')" id="th-fecha">Fecha</th>
+            <th onclick="sortBy('canal')" id="th-canal">Canal</th>
+            <th onclick="sortBy('descripcion')" id="th-desc">Descripción</th>
             <th>Ref.</th>
-            <th>Monto</th>
-            <th>Recibo</th>
-            <th>No.</th>
-            <th>Concepto</th>
+            <th onclick="sortBy('monto')" id="th-monto">Monto</th>
+            <th onclick="sortBy('recibo')" id="th-recibo">Recibo</th>
+            <th onclick="sortBy('numero_planilla')" id="th-planilla">No.</th>
+            <th onclick="sortBy('concepto')" id="th-concepto">Concepto</th>
             <th></th>
           </tr>
         </thead>
@@ -327,6 +331,8 @@
   ];
 
   let movimientos = [];
+  let sortCol = 'fecha_orden';
+  let sortDir = 1; // 1=asc, -1=desc
   let pendientesImport = [];
   let cachePrograma = {};
 
@@ -696,8 +702,18 @@
     if (campo !== 'monto') mostrarToast('✓ Guardado');
   }
 
+  function sortBy(col) {
+    if (sortCol === col) sortDir *= -1;
+    else { sortCol = col; sortDir = 1; }
+    document.querySelectorAll('thead th').forEach(th => th.classList.remove('sort-asc','sort-desc'));
+    const ids = { fecha_orden:'th-fecha', canal:'th-canal', descripcion:'th-desc',
+                  monto:'th-monto', recibo:'th-recibo', numero_planilla:'th-planilla', concepto:'th-concepto' };
+    const thEl = document.getElementById(ids[col]);
+    if (thEl) thEl.classList.add(sortDir === 1 ? 'sort-asc' : 'sort-desc');
+    renderTabla();
+  }
+
   async function cambiarTipo(id, nuevoTipo) {
-    const mov = movimientos.find(m => String(m.id) === String(id));
     if (!mov) return;
     // Ajustar signo del monto según el tipo
     let monto = Math.abs(Number(mov.monto));
@@ -745,7 +761,12 @@
         (m.numero_planilla ||'').toLowerCase().includes(buscar) ||
         (m.canal           ||'').toLowerCase().includes(buscar);
       return matchTipo && matchConcepto && matchBuscar;
-    }).sort((a, b) => (a.fecha_orden || '').localeCompare(b.fecha_orden || ''));
+    }).sort((a, b) => {
+      let va = a[sortCol] ?? '';
+      let vb = b[sortCol] ?? '';
+      if (sortCol === 'monto') return (Number(va) - Number(vb)) * sortDir;
+      return String(va).localeCompare(String(vb), 'es') * sortDir;
+    });
 
     document.getElementById('contadorFiltrado').textContent =
       filtrados.length === movimientos.length
