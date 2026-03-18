@@ -580,9 +580,9 @@
             rows.push([fechaRaw, 'Bancolombia', desc, '- -', '- -', '- -', val, 'secondary-menu']);
           }
         } else {
-          const wb = XLSX.read(new Uint8Array(e.target.result), { type: 'array', cellDates: false });
+          const wb = XLSX.read(new Uint8Array(e.target.result), { type: 'array', cellDates: true });
           const ws = wb.Sheets[wb.SheetNames[0]];
-          rows = XLSX.utils.sheet_to_json(ws, { header: 1, raw: false });
+          rows = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true });
         }
 
         const delExcel = [];
@@ -591,7 +591,9 @@
           const r = rows[i];
           if (!r || r.length < 7) continue;
 
-          const fechaRaw    = r[0] ? String(r[0]).trim() : '';
+          const fechaRaw    = r[0] instanceof Date
+            ? `${r[0].getFullYear()}-${String(r[0].getMonth()+1).padStart(2,'0')}-${String(r[0].getDate()).padStart(2,'0')}`
+            : (r[0] ? String(r[0]).trim() : '');
           const canal       = r[1] ? String(r[1]).trim() : 'Bancolombia';
           const descripcion = r[2] ? String(r[2]).trim() : '';
           const ref1        = r[3] && String(r[3]).trim() !== '- -' ? String(r[3]).trim() : '';
@@ -607,14 +609,24 @@
           if (!fecha_orden) { filasInvalidas++; continue; }
           const fecha = fechaISOaDisplay(fecha_orden);
 
+          // Detectar si la plantilla tiene columna Tipo (formato viejo, 10 cols)
+          // o no la tiene (formato nuevo, 9 cols): ajustar índices
+          const tieneTipo = r.length >= 9 && (String(r[4]).toLowerCase() === 'ingreso' || String(r[4]).toLowerCase() === 'egreso');
+          const idxMonto   = tieneTipo ? 5 : 4;
+          const idxRecibo  = tieneTipo ? 6 : 5;  // pero ya leímos monto de r[6] arriba... ajustar
+          const montoFinal = tieneTipo ? parsearMonto(r[5]) : monto;
+
+          // Guardar recibo completo tal como viene
+          const reciboLimpio = r[idxRecibo] ? String(r[idxRecibo]).trim() : '';
+
           delExcel.push({
-            fecha, canal, descripcion, referencia, monto,
-            tipo: monto >= 0 ? 'credito' : 'debito',
-            recibo:          r[7] ? String(r[7]).trim() : '',
-            concepto:        r[8] ? String(r[8]).trim() : '',
-            numero_planilla: r[9] ? String(r[9]).trim() : '',
+            fecha, canal, descripcion, referencia, monto: montoFinal,
+            tipo: montoFinal >= 0 ? 'credito' : 'debito',
+            recibo:          reciboLimpio,
+            concepto:        r[idxRecibo+1] ? String(r[idxRecibo+1]).trim() : '',
+            numero_planilla: r[idxRecibo+2] ? String(r[idxRecibo+2]).trim() : '',
             fecha_orden,
-            cuenta: r[10] ? String(r[10]).trim() : cuenta
+            cuenta: r[idxRecibo+3] ? String(r[idxRecibo+3]).trim() : cuenta
           });
         }
 
