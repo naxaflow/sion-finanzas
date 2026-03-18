@@ -350,7 +350,54 @@
     if (e.dataTransfer.files[0]) procesarExcel(e.dataTransfer.files[0]);
   });
 
-  document.addEventListener('DOMContentLoaded', () => cargarMovimientos());
+  document.addEventListener('DOMContentLoaded', async () => {
+    await migrarFechas();
+    cargarMovimientos();
+  });
+
+  // ── Migración única: normaliza fechas existentes en Supabase ─
+  async function migrarFechas() {
+    const KEY = 'sion_fechas_migradas_v1';
+    if (localStorage.getItem(KEY)) return; // ya se ejecutó
+
+    mostrarToast('⏳ Migrando fechas al nuevo formato...');
+    try {
+      // Traer todos los registros que tienen fecha pero puede que fecha_orden sea viejo formato
+      const { data, error } = await sb.from('movimientos')
+        .select('id, fecha, fecha_orden')
+        .order('id', { ascending: true });
+      if (error || !data) return;
+
+      const aActualizar = [];
+      for (const m of data) {
+        const fo = parsearFechaOrden(m.fecha_orden || m.fecha);
+        const fd = fo ? fechaISOaDisplay(fo) : null;
+        // Actualizar si fecha_orden es nulo/inválido O si fecha no está en dd/mm/yyyy
+        if (fo && (m.fecha_orden !== fo || m.fecha !== fd)) {
+          aActualizar.push({ id: m.id, fecha: fd, fecha_orden: fo });
+        }
+      }
+
+      if (aActualizar.length === 0) {
+        localStorage.setItem(KEY, '1');
+        mostrarToast('✅ Fechas ya estaban correctas');
+        return;
+      }
+
+      // Actualizar en lotes de 50
+      for (let i = 0; i < aActualizar.length; i += 50) {
+        const lote = aActualizar.slice(i, i + 50);
+        for (const r of lote) {
+          await sb.from('movimientos').update({ fecha: r.fecha, fecha_orden: r.fecha_orden }).eq('id', r.id);
+        }
+      }
+
+      localStorage.setItem(KEY, '1');
+      mostrarToast(`✅ ${aActualizar.length} registros migrados a dd/mm/yyyy`);
+    } catch(e) {
+      console.error('Error migración fechas:', e);
+    }
+  }
 
   function abrirExcel() {
     const mes = document.getElementById('selectMes').value;
@@ -522,20 +569,15 @@
           // Formato CSV Bancolombia: cuenta,sucursal,,fecha,,valor,codigo,descripcion,0,
           const texto = new TextDecoder('utf-8').decode(new Uint8Array(e.target.result));
           const lineas = texto.split('\n');
-          const MESES = ['','ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
           for (const linea of lineas) {
             const parts = linea.split(',').map(p => p.trim());
             if (parts.length < 8) continue;
-            const fechaRaw = parts[3]; // yyyymmdd
+            const fechaRaw = parts[3]; // yyyymmdd desde Bancolombia
             if (!fechaRaw || fechaRaw.length !== 8) continue;
-            const y = fechaRaw.slice(0,4);
-            const m = parseInt(fechaRaw.slice(4,6));
-            const d = fechaRaw.slice(6,8);
-            const fecha = `${d}-${MESES[m]}-${y.slice(2)}`;
-            const desc  = parts[7] || '';
-            const val   = parts[5] || '';
-            // Construir fila en formato estándar: [fecha, canal, desc, ref1, ref2, ref3, monto, clase]
-            rows.push([fecha, 'Bancolombia', desc, '- -', '- -', '- -', val, 'secondary-menu']);
+            const val = parts[5] || '';
+            const desc = parts[7] || '';
+            // Construir fila estándar — parsearFechaOrden maneja yyyymmdd
+            rows.push([fechaRaw, 'Bancolombia', desc, '- -', '- -', '- -', val, 'secondary-menu']);
           }
         } else {
           const wb = XLSX.read(new Uint8Array(e.target.result), { type: 'array', cellDates: false });
@@ -544,11 +586,12 @@
         }
 
         const delExcel = [];
+        let filasInvalidas = 0;
         for (let i = 0; i < rows.length; i++) {
           const r = rows[i];
           if (!r || r.length < 7) continue;
 
-          const fecha       = r[0] ? String(r[0]).trim() : '';
+          const fechaRaw    = r[0] ? String(r[0]).trim() : '';
           const canal       = r[1] ? String(r[1]).trim() : 'Bancolombia';
           const descripcion = r[2] ? String(r[2]).trim() : '';
           const ref1        = r[3] && String(r[3]).trim() !== '- -' ? String(r[3]).trim() : '';
@@ -556,9 +599,13 @@
           const referencia  = [ref1, ref2].filter(Boolean).join(' / ');
           const monto       = parsearMonto(r[6]);
 
-          if (!fecha || fecha.toUpperCase() === 'FECHA') continue;
+          if (!fechaRaw || fechaRaw.toUpperCase() === 'FECHA') continue;
           if (!descripcion) continue;
           if (monto === 0) continue;
+
+          const fecha_orden = parsearFechaOrden(fechaRaw);
+          if (!fecha_orden) { filasInvalidas++; continue; }
+          const fecha = fechaISOaDisplay(fecha_orden);
 
           delExcel.push({
             fecha, canal, descripcion, referencia, monto,
@@ -566,13 +613,16 @@
             recibo:          r[7] ? String(r[7]).trim() : '',
             concepto:        r[8] ? String(r[8]).trim() : '',
             numero_planilla: r[9] ? String(r[9]).trim() : '',
-            fecha_orden: parsearFechaOrden(fecha),
+            fecha_orden,
             cuenta: r[10] ? String(r[10]).trim() : cuenta
           });
         }
 
         if (delExcel.length === 0) {
           mostrarToast('Sin movimientos válidos en el archivo', true); return;
+        }
+        if (filasInvalidas > 0) {
+          mostrarToast(`⚠️ ${filasInvalidas} fila${filasInvalidas>1?'s':''} ignorada${filasInvalidas>1?'s':''} por fecha inválida`, true);
         }
 
         // Duplicados por fecha + descripcion + monto + cuenta
@@ -691,7 +741,12 @@
     }
     if (campo === 'fecha') {
       const fo = parsearFechaOrden(valor);
-      if (fo) update.fecha_orden = fo;
+      if (!fo) {
+        mostrarToast('⚠️ Fecha no reconocida. Usa dd/mm/aaaa (ej: 17/03/2026)', true);
+        return;
+      }
+      update.fecha_orden = fo;
+      update.fecha = fechaISOaDisplay(fo); // guardar también campo fecha normalizado
     }
     const { error } = await sb.from('movimientos').update(update).eq('id', id);
     if (error) { mostrarToast('Error guardando', true); return; }
@@ -785,7 +840,9 @@
       return `
       <tr>
         <td style="color:var(--muted);font-size:0.75rem;">${i+1}</td>
-        <td><input class="input-tabla" value="${esc(m.fecha)}" style="width:88px;"
+        <td><input class="input-tabla" value="${fechaISOaDisplay(m.fecha_orden)}" style="width:100px;"
+            placeholder="dd/mm/aaaa  ej: 17/03/2026"
+            title="Usa dd/mm/aaaa. También acepta: 17-03-26, 17/3/2026, 17-mar-26"
             onblur="guardarCampo('${m.id}','fecha',this.value)"
             onkeydown="if(event.key==='Enter')this.blur()"></td>
         <td style="color:var(--muted);font-size:0.78rem;">${esc(m.canal)}</td>
@@ -875,45 +932,123 @@
 
   // ── Generar plantilla vacía ───────────────────────────────
   function generarPlantilla() {
+    const instrucciones = [{
+      Fecha: '⚠️ Usar formato dd/mm/aaaa en columna Fecha. Ej: 17/03/2026',
+      Canal: '', Descripción: '', Referencia: '', Monto: '',
+      Recibo: '', Concepto: '', 'N° Planilla': '', Cuenta: ''
+    }];
     const data = [
       {
-        Fecha: '01-feb-26', Canal: 'Bancolombia', Descripción: 'PAGO SEGURIDAD SOCIAL',
-        Referencia: '', Tipo: 'Ingreso', Monto: 500000,
+        Fecha: '01/02/2026', Canal: 'Bancolombia', Descripción: 'PAGO SEGURIDAD SOCIAL',
+        Referencia: '', Monto: 500000,
         Recibo: 'CI-000001', Concepto: 'Seguridad Social', 'N° Planilla': '36432763',
         Cuenta: 'Banco SION'
       },
       {
-        Fecha: '05-feb-26', Canal: 'Daviplata', Descripción: 'TRANSFERENCIA HERNAN',
-        Referencia: '', Tipo: 'Egreso', Monto: -612000,
+        Fecha: '05/02/2026', Canal: 'Daviplata', Descripción: 'TRANSFERENCIA HERNAN',
+        Referencia: '', Monto: -612000,
         Recibo: '', Concepto: 'Hernan', 'N° Planilla': '',
         Cuenta: 'Daviplata'
       },
       {
-        Fecha: '10-feb-26', Canal: 'Independientes', Descripción: 'PAGO SS INDEPENDIENTE',
-        Referencia: '', Tipo: 'Ingreso', Monto: 249000,
+        Fecha: '10/02/2026', Canal: 'Independientes', Descripción: 'PAGO SS INDEPENDIENTE',
+        Referencia: '', Monto: 249000,
         Recibo: 'CI-000002', Concepto: 'Seguridad Social', 'N° Planilla': '36758527',
         Cuenta: 'Independientes'
       }
     ];
-    const ws = XLSX.utils.json_to_sheet(data);
+    const ws = XLSX.utils.json_to_sheet([...instrucciones, ...data]);
     ws['!cols'] = [
-      {wch:12},{wch:14},{wch:35},{wch:20},{wch:10},
-      {wch:14},{wch:14},{wch:18},{wch:14},{wch:16}
+      {wch:14},{wch:14},{wch:35},{wch:20},{wch:14},
+      {wch:14},{wch:18},{wch:14},{wch:16}
     ];
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Movimientos');
     XLSX.writeFile(wb, 'Plantilla_Movimientos_Banco.xlsx');
   }
 
-  // ── Helpers ───────────────────────────────────────────────
+  // ── Helpers de fecha ─────────────────────────────────────
+  // Convierte CUALQUIER formato razonable → YYYY-MM-DD o null
   function parsearFechaOrden(fecha) {
-    // Convierte "01-ene-26" a "2026-01-01" para ordenar correctamente
     if (!fecha) return null;
-    const MESES = {ene:'01',feb:'02',mar:'03',abr:'04',may:'05',jun:'06',
-                   jul:'07',ago:'08',sep:'09',oct:'10',nov:'11',dic:'12'};
-    const m = String(fecha).toLowerCase().match(/^(\d{2})-([a-z]{3})-(\d{2})$/);
-    if (m) return `20${m[3]}-${MESES[m[2]] || '01'}-${m[1]}`;
+    const s = String(fecha).trim();
+
+    const MESES = {ene:1,feb:2,mar:3,abr:4,may:5,jun:6,
+                   jul:7,ago:8,sep:9,oct:10,nov:11,dic:12};
+
+    // Normalizar año de 2 dígitos
+    function normAnio(a) {
+      const n = parseInt(a);
+      if (n >= 50) return 1900 + n;
+      return 2000 + n;
+    }
+    function pad(n) { return String(n).padStart(2,'0'); }
+
+    // yyyy-mm-dd (ya viene bien de Supabase)
+    let m = s.match(/^(\d{4})[\/\-\.](\d{1,2})[\/\-\.](\d{1,2})$/);
+    if (m) {
+      const [,y,mo,d] = m;
+      if (parseInt(mo)<1||parseInt(mo)>12||parseInt(d)<1||parseInt(d)>31) return null;
+      return `${y}-${pad(mo)}-${pad(d)}`;
+    }
+
+    // dd/mm/yyyy o dd-mm-yyyy o dd.mm.yyyy
+    m = s.match(/^(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{4})$/);
+    if (m) {
+      const [,d,mo,y] = m;
+      if (parseInt(mo)<1||parseInt(mo)>12||parseInt(d)<1||parseInt(d)>31) return null;
+      return `${y}-${pad(mo)}-${pad(d)}`;
+    }
+
+    // dd/mm/yy o dd-mm-yy
+    m = s.match(/^(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{2})$/);
+    if (m) {
+      const [,d,mo,yy] = m;
+      if (parseInt(mo)<1||parseInt(mo)>12||parseInt(d)<1||parseInt(d)>31) return null;
+      return `${normAnio(yy)}-${pad(mo)}-${pad(d)}`;
+    }
+
+    // dd-mmm-yyyy o dd/mmm/yyyy  (17-mar-2026)
+    m = s.toLowerCase().match(/^(\d{1,2})[\/\-\. ]([a-z]{3})[\/\-\. ](\d{4})$/);
+    if (m) {
+      const mo = MESES[m[2]];
+      if (!mo) return null;
+      if (parseInt(m[1])<1||parseInt(m[1])>31) return null;
+      return `${m[3]}-${pad(mo)}-${pad(m[1])}`;
+    }
+
+    // dd-mmm-yy o dd/mmm/yy  (17-mar-26)
+    m = s.toLowerCase().match(/^(\d{1,2})[\/\-\. ]([a-z]{3})[\/\-\. ](\d{2})$/);
+    if (m) {
+      const mo = MESES[m[2]];
+      if (!mo) return null;
+      if (parseInt(m[1])<1||parseInt(m[1])>31) return null;
+      return `${normAnio(m[3])}-${pad(mo)}-${pad(m[1])}`;
+    }
+
+    // yyyymmdd (formato Bancolombia CSV)
+    m = s.match(/^(\d{4})(\d{2})(\d{2})$/);
+    if (m) {
+      const [,y,mo,d] = m;
+      if (parseInt(mo)<1||parseInt(mo)>12||parseInt(d)<1||parseInt(d)>31) return null;
+      return `${y}-${mo}-${d}`;
+    }
+
     return null;
+  }
+
+  // Convierte YYYY-MM-DD → dd/mm/yyyy para mostrar al usuario
+  function fechaISOaDisplay(iso) {
+    if (!iso) return '';
+    const m = String(iso).match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (m) return `${m[3]}/${m[2]}/${m[1]}`;
+    // Si ya viene en otro formato, intentar parsear primero
+    const fo = parsearFechaOrden(iso);
+    if (fo) {
+      const m2 = fo.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+      if (m2) return `${m2[3]}/${m2[2]}/${m2[1]}`;
+    }
+    return iso;
   }
 
   function parsearMonto(texto) {
