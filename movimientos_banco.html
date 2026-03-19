@@ -350,54 +350,8 @@
     if (e.dataTransfer.files[0]) procesarExcel(e.dataTransfer.files[0]);
   });
 
-  document.addEventListener('DOMContentLoaded', async () => {
-    await migrarFechas();
-    cargarMovimientos();
-  });
+  document.addEventListener('DOMContentLoaded', () => cargarMovimientos());
 
-  // ── Migración única: normaliza fechas existentes en Supabase ─
-  async function migrarFechas() {
-    const KEY = 'sion_fechas_migradas_v1';
-    if (localStorage.getItem(KEY)) return; // ya se ejecutó
-
-    mostrarToast('⏳ Migrando fechas al nuevo formato...');
-    try {
-      // Traer todos los registros que tienen fecha pero puede que fecha_orden sea viejo formato
-      const { data, error } = await sb.from('movimientos')
-        .select('id, fecha, fecha_orden')
-        .order('id', { ascending: true });
-      if (error || !data) return;
-
-      const aActualizar = [];
-      for (const m of data) {
-        const fo = parsearFechaOrden(m.fecha_orden || m.fecha);
-        const fd = fo ? fechaISOaDisplay(fo) : null;
-        // Actualizar si fecha_orden es nulo/inválido O si fecha no está en dd/mm/yyyy
-        if (fo && (m.fecha_orden !== fo || m.fecha !== fd)) {
-          aActualizar.push({ id: m.id, fecha: fd, fecha_orden: fo });
-        }
-      }
-
-      if (aActualizar.length === 0) {
-        localStorage.setItem(KEY, '1');
-        mostrarToast('✅ Fechas ya estaban correctas');
-        return;
-      }
-
-      // Actualizar en lotes de 50
-      for (let i = 0; i < aActualizar.length; i += 50) {
-        const lote = aActualizar.slice(i, i + 50);
-        for (const r of lote) {
-          await sb.from('movimientos').update({ fecha: r.fecha, fecha_orden: r.fecha_orden }).eq('id', r.id);
-        }
-      }
-
-      localStorage.setItem(KEY, '1');
-      mostrarToast(`✅ ${aActualizar.length} registros migrados a dd/mm/yyyy`);
-    } catch(e) {
-      console.error('Error migración fechas:', e);
-    }
-  }
 
   function abrirExcel() {
     const mes = document.getElementById('selectMes').value;
