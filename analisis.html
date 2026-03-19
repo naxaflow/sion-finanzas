@@ -356,7 +356,8 @@
         let mesPrev = parseInt(mes) - 1;
         let anioPrev = parseInt(anio);
         if (mesPrev === 0) { mesPrev = 12; anioPrev--; }
-        const fechaHastaPrev = `${anioPrev}-${String(mesPrev).padStart(2,'0')}-31`;
+        const ultimoDiaPrev = new Date(anioPrev, mesPrev, 0).getDate();
+        const fechaHastaPrev = `${anioPrev}-${String(mesPrev).padStart(2,'0')}-${String(ultimoDiaPrev).padStart(2,'0')}`;
 
         const { data: movsAcum } = await sb.from('movimientos').select('monto')
           .eq('cuenta', cuenta.id)
@@ -378,15 +379,12 @@
   function renderAnalisis() {
     const { movs, prog, saldosIni, mes, anio } = datosAnalisis;
 
-    // Agrupar banco por cuenta + concepto
+    // Agrupar banco por cuenta + concepto — el signo del monto manda siempre
     const bancoPorCuenta = {};
     for (const m of movs) {
       if (!bancoPorCuenta[m.cuenta]) bancoPorCuenta[m.cuenta] = {};
       const c = m.concepto || '(sin concepto)';
-      // Forzar signo según tipo: debito siempre negativo, credito siempre positivo
-      let monto = Math.abs(Number(m.monto));
-      if (m.tipo === 'debito') monto = -monto;
-      bancoPorCuenta[m.cuenta][c] = (bancoPorCuenta[m.cuenta][c] || 0) + monto;
+      bancoPorCuenta[m.cuenta][c] = (bancoPorCuenta[m.cuenta][c] || 0) + Number(m.monto);
     }
 
     // Agrupar programa por banco
@@ -428,7 +426,7 @@
 
     for (const cuenta of CUENTAS) {
       const banco = bancoPorCuenta[cuenta.id] || {};
-      const prog_c = progPorCuenta[cuenta.id] || { segSocial: 0, admon: 0, count: 0 };
+      const prog_c = progPorCuenta[cuenta.id] || { total: 0, totalSS: 0, admon: 0, count: 0 };
       const saldoIni = saldosIni[cuenta.id] || 0;
 
       const ingresos = Object.entries(banco)
@@ -551,7 +549,7 @@
 
     for (const cuenta of CUENTAS) {
       const banco = bancoPorCuenta[cuenta.id] || {};
-      const prog_c = progPorCuenta[cuenta.id] || { segSocial: 0, admon: 0 };
+      const prog_c = progPorCuenta[cuenta.id] || { total: 0, totalSS: 0, admon: 0 };
 
       // Cruce por número de planilla:
       // Banco: movimientos con numero_planilla vs programa: planilla
@@ -644,7 +642,7 @@
     const tbody = document.getElementById('tablaSinConceptoBody');
     tbody.innerHTML = lista.map(m => `
       <tr>
-        <td>${m.fecha}</td>
+        <td>${fechaDisplay(m.fecha_orden)}</td>
         <td>${m.cuenta}</td>
         <td>${m.descripcion}</td>
         <td class="num ${Number(m.monto)>=0?'pos':'neg'}">${formatCOP(Number(m.monto))}</td>
@@ -736,7 +734,7 @@
           return `<option value="${c}" ${sel}>${c || '-- Concepto --'}</option>`;
         }).join('');
         html += '<div class="diff-item">';
-        html += `<span class="di-fecha">${m.fecha}</span>`;
+        html += `<span class="di-fecha">${fechaDisplay(m.fecha_orden)}</span>`;
         html += `<span class="di-desc">${m.descripcion}</span>`;
         html += `<span class="di-monto">${formatCOP(Number(m.monto))}</span>`;
         html += `<span class="di-recibo">${m.recibo || '— sin recibo'}</span>`;
@@ -783,7 +781,7 @@
 
     document.getElementById('detalleBody').innerHTML = movsFiltrados.map(m => `
       <tr>
-        <td>${m.fecha}</td>
+        <td>${fechaDisplay(m.fecha_orden)}</td>
         <td>${m.descripcion || ''}</td>
         <td style="font-size:0.75rem;color:var(--muted);">${m.recibo || '—'}</td>
         <td style="font-size:0.75rem;color:var(--muted);">${m.numero_planilla || '—'}</td>
@@ -831,9 +829,12 @@
     return new Intl.NumberFormat('es-CO',{style:'currency',currency:'COP',
       minimumFractionDigits:2,maximumFractionDigits:2}).format(n||0);
   }
-  function formatCOP(n) {
-    return new Intl.NumberFormat('es-CO',{style:'currency',currency:'COP',
-      minimumFractionDigits:2,maximumFractionDigits:2}).format(n||0);
+  function fechaDisplay(f) {
+    if (!f) return '—';
+    // Si viene YYYY-MM-DD → dd/mm/yyyy
+    const m = String(f).match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (m) return `${m[3]}/${m[2]}/${m[1]}`;
+    return f;
   }
   function escHTML(str) {
     return String(str).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/'/g,'&#39;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
@@ -843,6 +844,11 @@
     t.textContent = msg; t.className = 'toast show'+(error?' error':'');
     setTimeout(()=>t.className='toast', 3500);
   }
+
+  // NOTA: Manejo de fechas en este archivo solo lectura (fecha_orden YYYY-MM-DD desde BD)
+  // Corrección de saldo inicial aplicada: último día real del mes con new Date(..., 0).getDate()
+  // No se requiere parseo permisivo aquí (ya se hace en movimientos_banco.html)
+
 </script>
 </body>
 </html>
