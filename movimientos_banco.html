@@ -542,7 +542,7 @@
     const faltantes = recibos.filter(r => r && !cachePrograma[r]);
     if (faltantes.length === 0) return;
     const { data } = await sb.from('ingreso_programa')
-      .select('recibo, afiliado, banco, total, planilla')
+      .select('recibo, afiliado, banco, total, total_ss, eps_val, arl_val, afp_val, ccf_val, fsp, admon, detalle, planilla')
       .in('recibo', faltantes);
     if (data) data.forEach(r => { cachePrograma[r.recibo] = r; });
   }
@@ -552,7 +552,7 @@
     if (!recibo || recibo.trim() === '') return;
     if (!cachePrograma[recibo]) {
       const { data } = await sb.from('ingreso_programa')
-        .select('recibo, afiliado, banco, total, planilla')
+        .select('recibo, afiliado, banco, total, total_ss, eps_val, arl_val, afp_val, ccf_val, fsp, admon, detalle, planilla')
         .eq('recibo', recibo.trim()).single();
       if (data) cachePrograma[recibo] = data;
     }
