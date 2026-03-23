@@ -396,6 +396,177 @@
   </div>
 </div>
 
+<!-- Modal Tercero: buscar o crear -->
+<div id="modalTercero" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:4000;align-items:center;justify-content:center;">
+  <div style="background:white;border-radius:12px;width:90%;max-width:480px;box-shadow:0 20px 60px rgba(0,0,0,0.35);overflow:hidden;">
+    <div style="padding:14px 20px;background:var(--header-bg);color:white;display:flex;justify-content:space-between;align-items:center;">
+      <h3 style="font-size:0.95rem;font-weight:700;">👤 Tercero</h3>
+      <button onclick="cerrarTercero()" style="background:none;border:none;color:white;font-size:1.1rem;cursor:pointer;">✕</button>
+    </div>
+    <div style="padding:20px;">
+
+      <!-- Panel buscar -->
+      <div id="terceroBuscarPanel">
+        <p style="font-size:0.83rem;color:var(--muted);margin-bottom:12px;">El movimiento no tiene CI. Digitá el número de documento del afiliado para buscarlo.</p>
+        <div style="display:flex;gap:8px;margin-bottom:12px;">
+          <input type="text" id="terceroNumInput" placeholder="Número CC/NIT..."
+            style="flex:1;border:1px solid var(--border);border-radius:6px;padding:8px 12px;font-size:0.88rem;outline:none;"
+            onkeydown="if(event.key==='Enter')buscarTercero()">
+          <button onclick="buscarTercero()" style="padding:8px 16px;border-radius:6px;border:none;background:var(--accent);color:white;font-size:0.85rem;font-weight:600;cursor:pointer;">Buscar</button>
+        </div>
+        <div id="terceroResultado" style="font-size:0.85rem;margin-bottom:14px;min-height:36px;"></div>
+        <div style="display:flex;gap:8px;justify-content:flex-end;">
+          <button onclick="mostrarFormTercero()" style="padding:7px 14px;border-radius:6px;border:1px solid var(--border);background:white;font-size:0.83rem;cursor:pointer;">+ Crear nuevo</button>
+          <button id="btnUsarTercero" onclick="usarTerceroEncontrado()" style="display:none;padding:7px 16px;border-radius:6px;border:none;background:var(--accent);color:white;font-size:0.83rem;font-weight:600;cursor:pointer;">✓ Usar este tercero</button>
+        </div>
+      </div>
+
+      <!-- Panel crear -->
+      <div id="terceroCrearPanel" style="display:none;">
+        <p style="font-size:0.83rem;color:var(--muted);margin-bottom:14px;">Crear nuevo tercero</p>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;">
+          <div>
+            <label style="font-size:0.75rem;color:var(--muted);display:block;margin-bottom:4px;">Tipo doc</label>
+            <select id="tTipoDoc" style="width:100%;border:1px solid var(--border);border-radius:6px;padding:7px 10px;font-size:0.85rem;">
+              <option value="CC">CC</option>
+              <option value="NIT">NIT</option>
+              <option value="CE">CE</option>
+              <option value="PA">PA</option>
+            </select>
+          </div>
+          <div>
+            <label style="font-size:0.75rem;color:var(--muted);display:block;margin-bottom:4px;">Número *</label>
+            <input type="text" id="tNumero" placeholder="Ej: 12345678"
+              style="width:100%;border:1px solid var(--border);border-radius:6px;padding:7px 10px;font-size:0.85rem;outline:none;">
+          </div>
+          <div style="grid-column:1/-1;">
+            <label style="font-size:0.75rem;color:var(--muted);display:block;margin-bottom:4px;">Nombre completo *</label>
+            <input type="text" id="tNombre" placeholder="Ej: Juan Carlos Pérez Rodríguez"
+              style="width:100%;border:1px solid var(--border);border-radius:6px;padding:7px 10px;font-size:0.85rem;outline:none;">
+          </div>
+          <div>
+            <label style="font-size:0.75rem;color:var(--muted);display:block;margin-bottom:4px;">Teléfono</label>
+            <input type="text" id="tTelefono" placeholder="Ej: 3001234567"
+              style="width:100%;border:1px solid var(--border);border-radius:6px;padding:7px 10px;font-size:0.85rem;outline:none;">
+          </div>
+          <div>
+            <label style="font-size:0.75rem;color:var(--muted);display:block;margin-bottom:4px;">Email</label>
+            <input type="text" id="tEmail" placeholder="correo@ejemplo.com"
+              style="width:100%;border:1px solid var(--border);border-radius:6px;padding:7px 10px;font-size:0.85rem;outline:none;">
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;justify-content:flex-end;">
+          <button onclick="mostrarBuscarTercero()" style="padding:7px 14px;border-radius:6px;border:1px solid var(--border);background:white;font-size:0.83rem;cursor:pointer;">← Volver</button>
+          <button onclick="crearTercero()" style="padding:7px 16px;border-radius:6px;border:none;background:var(--accent);color:white;font-size:0.83rem;font-weight:600;cursor:pointer;">💾 Guardar tercero</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- Modal Planilla Egreso: subir XLS UGPP y cruce automático -->
+<div id="modalPlanillaEgreso" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:4000;align-items:center;justify-content:center;">
+  <div style="background:white;border-radius:12px;width:95%;max-width:760px;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,0.35);">
+
+    <div style="padding:14px 20px;background:var(--header-bg);color:white;border-radius:12px 12px 0 0;display:flex;justify-content:space-between;align-items:center;">
+      <div>
+        <h3 style="font-size:0.95rem;font-weight:700;">📄 Planilla UGPP — Cruce automático</h3>
+        <p style="font-size:0.75rem;opacity:0.65;margin-top:2px;">RpPlanillas_XXXXXXXX_YYYYMM_X.xls</p>
+      </div>
+      <button onclick="cerrarPlanillaEgreso()" style="background:none;border:none;color:white;font-size:1.1rem;cursor:pointer;">✕</button>
+    </div>
+
+    <div style="overflow-y:auto;flex:1;padding:20px 22px;">
+
+      <!-- Paso 1: subir archivo -->
+      <div id="peStep1" style="">
+        <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:14px 16px;margin-bottom:16px;font-size:0.83rem;color:#1e40af;">
+          <strong>Movimiento:</strong> <span id="peMovDesc"></span> &nbsp;|&nbsp;
+          <strong>Monto:</strong> <span id="peMontoBanco" style="color:var(--debit);font-weight:700;"></span>
+        </div>
+        <div id="peDropZone"
+          style="border:2px dashed var(--border);border-radius:10px;padding:36px;text-align:center;cursor:pointer;transition:0.2s;"
+          onclick="document.getElementById('peFileInput').click()"
+          ondragover="event.preventDefault();this.style.borderColor='var(--accent)'"
+          ondragleave="this.style.borderColor=''"
+          ondrop="event.preventDefault();this.style.borderColor='';procesarPlanillaXLS(event.dataTransfer.files[0])">
+          <div style="font-size:2rem;margin-bottom:8px;">📂</div>
+          <p style="font-weight:600;font-size:0.9rem;margin-bottom:4px;">Subí el archivo de planilla UGPP</p>
+          <p style="font-size:0.78rem;color:var(--muted);">RpPlanillas_XXXXXXXX_YYYYMM_X.xls — arrastrá o hacé clic</p>
+        </div>
+        <input type="file" id="peFileInput" accept=".xls,.xlsx" style="display:none"
+          onchange="if(this.files[0])procesarPlanillaXLS(this.files[0]);this.value=''">
+      </div>
+
+      <!-- Paso 2: resultado del cruce -->
+      <div id="peStep2" style="display:none;">
+
+        <!-- Resumen cabeza planilla -->
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px;">
+          <div style="background:#f0fdf4;border:1px solid #86efac;border-radius:8px;padding:10px 14px;">
+            <div style="font-size:0.7rem;color:var(--muted);text-transform:uppercase;margin-bottom:3px;">No. Planilla</div>
+            <div id="peNoPlanilla" style="font-weight:700;color:var(--accent);font-size:1rem;"></div>
+          </div>
+          <div style="background:#f0fdf4;border:1px solid #86efac;border-radius:8px;padding:10px 14px;">
+            <div style="font-size:0.7rem;color:var(--muted);text-transform:uppercase;margin-bottom:3px;">Período</div>
+            <div id="pePeriodo" style="font-weight:700;font-size:1rem;"></div>
+          </div>
+          <div style="background:#f0fdf4;border:1px solid #86efac;border-radius:8px;padding:10px 14px;">
+            <div style="font-size:0.7rem;color:var(--muted);text-transform:uppercase;margin-bottom:3px;">Afiliados en planilla</div>
+            <div id="peCantAfil" style="font-weight:700;font-size:1rem;"></div>
+          </div>
+        </div>
+
+        <!-- Totales planilla vs banco -->
+        <div style="background:#fff8e1;border:1px solid #fcd34d;border-radius:8px;padding:12px 16px;margin-bottom:16px;font-size:0.83rem;">
+          <div style="display:flex;gap:24px;flex-wrap:wrap;">
+            <span><span style="color:#92400e;font-weight:600;">Salud: </span><span id="peTotSalud" style="font-weight:700;"></span></span>
+            <span><span style="color:#92400e;font-weight:600;">Pensión: </span><span id="peTotPension" style="font-weight:700;"></span></span>
+            <span><span style="color:#92400e;font-weight:600;">Riesgos: </span><span id="peTotRiesgos" style="font-weight:700;"></span></span>
+            <span><span style="color:#92400e;font-weight:600;">Caja: </span><span id="peTotCaja" style="font-weight:700;"></span></span>
+            <span style="margin-left:auto;"><span style="color:#92400e;font-weight:700;">TOTAL PLANILLA: </span><span id="peTotPlanilla" style="font-weight:700;color:#dc2626;font-size:0.95rem;"></span></span>
+          </div>
+          <div style="margin-top:8px;border-top:1px solid #fde68a;padding-top:8px;display:flex;gap:20px;flex-wrap:wrap;">
+            <span><span style="color:#92400e;font-weight:600;">Monto banco: </span><span id="peMontoBanco2" style="font-weight:700;"></span></span>
+            <span><span style="color:#92400e;font-weight:600;">Diferencia: </span><span id="peDiffBanco" style="font-weight:700;"></span></span>
+          </div>
+        </div>
+
+        <!-- Tabla de cruce CCs vs CIs -->
+        <div style="font-size:0.8rem;font-weight:600;color:var(--muted);text-transform:uppercase;margin-bottom:6px;display:flex;justify-content:space-between;">
+          <span>Cruce CC → CI</span>
+          <span id="peCruceResumen"></span>
+        </div>
+        <div style="max-height:260px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;">
+          <table style="width:100%;border-collapse:collapse;font-size:0.8rem;">
+            <thead style="position:sticky;top:0;">
+              <tr style="background:#f8fafc;">
+                <th style="padding:7px 10px;text-align:left;font-size:0.68rem;font-weight:700;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border);">CC (planilla)</th>
+                <th style="padding:7px 10px;text-align:left;font-size:0.68rem;font-weight:700;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border);">Nombre (planilla)</th>
+                <th style="padding:7px 10px;text-align:left;font-size:0.68rem;font-weight:700;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border);">CI encontrado</th>
+                <th style="padding:7px 10px;text-align:left;font-size:0.68rem;font-weight:700;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border);">Afiliado en programa</th>
+                <th style="padding:7px 10px;text-align:right;font-size:0.68rem;font-weight:700;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border);">Total SS</th>
+              </tr>
+            </thead>
+            <tbody id="peCruceTabla"></tbody>
+          </table>
+        </div>
+
+        <div style="margin-top:10px;font-size:0.78rem;color:var(--muted);" id="peSinCIMsg"></div>
+
+      </div><!-- /step2 -->
+    </div><!-- /body -->
+
+    <div style="padding:14px 20px;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;" id="peFooter">
+      <button onclick="peVolver()" style="padding:7px 14px;border-radius:6px;border:1px solid var(--border);background:white;font-size:0.83rem;cursor:pointer;display:none;" id="peBtnVolver">← Subir otro archivo</button>
+      <span style="font-size:0.79rem;color:var(--muted);" id="peFooterMsg"></span>
+      <button onclick="usarCruceEnComprobante()" id="peBtnUsar" style="display:none;padding:8px 18px;border-radius:7px;border:none;background:var(--accent);color:white;font-size:0.85rem;font-weight:600;cursor:pointer;">✓ Aplicar cruce al comprobante</button>
+    </div>
+
+  </div>
+</div>
+
 <footer>SION ERP • Sistema financiero</footer>
 <div class="toast" id="toast"></div>
 
@@ -860,6 +1031,365 @@
   let contabMovId    = null;
   let contabLineasData = [];
 
+  // ── Terceros ──────────────────────────────────────────────
+  let terceroEncontrado = null; // { id, tipo_doc, numero, nombre, telefono, email }
+
+  function abrirTercero() {
+    terceroEncontrado = null;
+    document.getElementById('terceroNumInput').value = '';
+    document.getElementById('terceroResultado').innerHTML = '';
+    document.getElementById('btnUsarTercero').style.display = 'none';
+    mostrarBuscarTercero();
+    document.getElementById('modalTercero').style.display = 'flex';
+  }
+
+  function cerrarTercero() {
+    document.getElementById('modalTercero').style.display = 'none';
+  }
+
+  function mostrarBuscarTercero() {
+    document.getElementById('terceroBuscarPanel').style.display = 'block';
+    document.getElementById('terceroCrearPanel').style.display = 'none';
+  }
+
+  function mostrarFormTercero() {
+    const numBuscado = document.getElementById('terceroNumInput').value.trim();
+    document.getElementById('tNumero').value = numBuscado;
+    document.getElementById('tNombre').value = '';
+    document.getElementById('tTelefono').value = '';
+    document.getElementById('tEmail').value = '';
+    document.getElementById('terceroBuscarPanel').style.display = 'none';
+    document.getElementById('terceroCrearPanel').style.display = 'block';
+  }
+
+  async function buscarTercero() {
+    const num = document.getElementById('terceroNumInput').value.trim();
+    const res = document.getElementById('terceroResultado');
+    const btn = document.getElementById('btnUsarTercero');
+    terceroEncontrado = null;
+    btn.style.display = 'none';
+    if (!num) { res.innerHTML = '<span style="color:var(--danger)">Digitá un número de documento</span>'; return; }
+    res.innerHTML = '<span style="color:var(--muted)">Buscando...</span>';
+    // Buscar primero en terceros
+    const { data: t } = await sb.from('terceros').select('*').eq('numero', num).single();
+    if (t) {
+      terceroEncontrado = t;
+      res.innerHTML = '<div style="background:#f0fdf4;border:1px solid #86efac;border-radius:6px;padding:8px 12px;">'
+        + '<span style="font-weight:700;color:var(--accent);">✓ Encontrado en terceros</span><br>'
+        + '<span style="font-size:0.83rem;">' + t.tipo_doc + ' ' + t.numero + ' — ' + t.nombre + '</span>'
+        + (t.telefono ? '<br><span style="font-size:0.78rem;color:var(--muted);">Tel: ' + t.telefono + '</span>' : '')
+        + '</div>';
+      btn.style.display = 'inline-block';
+      return;
+    }
+    // Buscar en ingreso_programa por cc
+    const { data: ip } = await sb.from('ingreso_programa').select('cc, afiliado').eq('cc', num).limit(1).maybeSingle();
+    if (ip) {
+      res.innerHTML = '<div style="background:#eff6ff;border:1px solid #93c5fd;border-radius:6px;padding:8px 12px;">'
+        + '<span style="font-weight:700;color:#2563eb;">📋 Encontrado en Ingreso Programa (no en terceros)</span><br>'
+        + '<span style="font-size:0.83rem;">CC ' + ip.cc + ' — ' + ip.afiliado + '</span><br>'
+        + '<span style="font-size:0.78rem;color:var(--muted);">Podés crearlo como tercero o usarlo directamente.</span></div>';
+      // Pre-llenar formulario de creación
+      document.getElementById('tNumero').value = ip.cc;
+      document.getElementById('tNombre').value = ip.afiliado;
+      document.getElementById('tTipoDoc').value = 'CC';
+      btn.style.display = 'inline-block';
+      terceroEncontrado = { numero: ip.cc, nombre: ip.afiliado, tipo_doc: 'CC', telefono: '', email: '', fromIP: true };
+      return;
+    }
+    res.innerHTML = '<span style="color:var(--muted);">No encontrado. Podés crearlo como nuevo tercero.</span>';
+  }
+
+  function usarTerceroEncontrado() {
+    if (!terceroEncontrado) return;
+    // Actualizar encabezado del comprobante
+    document.getElementById('contabCC').textContent       = terceroEncontrado.numero || '—';
+    document.getElementById('contabAfiliado').textContent = terceroEncontrado.nombre || '—';
+    cerrarTercero();
+    mostrarToast('✓ Tercero asignado: ' + terceroEncontrado.nombre);
+  }
+
+  async function crearTercero() {
+    const tipo_doc = document.getElementById('tTipoDoc').value;
+    const numero   = document.getElementById('tNumero').value.trim();
+    const nombre   = document.getElementById('tNombre').value.trim();
+    const telefono = document.getElementById('tTelefono').value.trim();
+    const email    = document.getElementById('tEmail').value.trim();
+    if (!numero || !nombre) { mostrarToast('⚠️ Número y nombre son obligatorios', true); return; }
+    const { data, error } = await sb.from('terceros').insert([{ tipo_doc, numero, nombre, telefono, email }]).select().single();
+    if (error) {
+      if (error.code === '23505') {
+        mostrarToast('⚠️ Ya existe un tercero con ese número', true);
+      } else {
+        mostrarToast('Error creando tercero: ' + error.message, true);
+      }
+      return;
+    }
+    terceroEncontrado = data;
+    document.getElementById('contabCC').textContent       = data.numero;
+    document.getElementById('contabAfiliado').textContent = data.nombre;
+    cerrarTercero();
+    mostrarToast('✅ Tercero creado y asignado');
+  }
+
+  // ── Planilla Egreso (cruce UGPP desde archivo XLS) ────────
+  let crucePlanillaData  = [];  // registros ingreso_programa encontrados
+  let cruceXLSTotales    = {};  // { salud, pension, riesgos, caja, total }
+  let cruceXLSNoPlanilla = '';
+  let cruceXLSPeriodo    = '';
+  let peMontoMovimiento  = 0;
+
+  function abrirCruceEgreso(monto) {
+    // Resetear
+    crucePlanillaData  = [];
+    cruceXLSTotales    = {};
+    cruceXLSNoPlanilla = '';
+    cruceXLSPeriodo    = '';
+    peMontoMovimiento  = Math.abs(monto);
+
+    const m = movimientos.find(x => String(x.id) === String(contabMovId));
+    document.getElementById('peMovDesc').textContent    = m ? (m.descripcion || '') : '';
+    document.getElementById('peMontoBanco').textContent = formatCOP(peMontoMovimiento);
+
+    // Mostrar paso 1
+    document.getElementById('peStep1').style.display = 'block';
+    document.getElementById('peStep2').style.display = 'none';
+    document.getElementById('peBtnVolver').style.display = 'none';
+    document.getElementById('peBtnUsar').style.display   = 'none';
+    document.getElementById('peFooterMsg').textContent   = '';
+
+    document.getElementById('modalPlanillaEgreso').style.display = 'flex';
+  }
+
+  function cerrarPlanillaEgreso() {
+    document.getElementById('modalPlanillaEgreso').style.display = 'none';
+  }
+
+  function peVolver() {
+    document.getElementById('peStep1').style.display = 'block';
+    document.getElementById('peStep2').style.display = 'none';
+    document.getElementById('peBtnVolver').style.display = 'none';
+    document.getElementById('peBtnUsar').style.display   = 'none';
+    document.getElementById('peFooterMsg').textContent   = '';
+  }
+
+  async function procesarPlanillaXLS(archivo) {
+    if (!archivo) return;
+    mostrarToast('⏳ Leyendo planilla UGPP...');
+
+    const reader = new FileReader();
+    reader.onload = async function(e) {
+      try {
+        const wb = XLSX.read(new Uint8Array(e.target.result), { type: 'array', cellDates: true });
+
+        // ── 1. Hoja Cabeza ─────────────────────────────────
+        const wsCabeza = wb.Sheets['Cabeza'];
+        if (!wsCabeza) { mostrarToast('⚠️ No se encontró la hoja "Cabeza"', true); return; }
+        const cabeza = XLSX.utils.sheet_to_json(wsCabeza, { header: 1, raw: true });
+        // fila 10 (índice 10): col 0 = periodo pension, col 1 = periodo salud
+        // fila 12 (índice 12): col 1 = número de radicación (número planilla)
+        let noPlanilla = '';
+        let periodo    = '';
+        if (cabeza[12] && cabeza[12][1]) noPlanilla = String(cabeza[12][1]).trim();
+        if (cabeza[10] && cabeza[10][0]) periodo    = String(cabeza[10][0]).trim(); // ej: "2026/02"
+
+        if (!noPlanilla) { mostrarToast('⚠️ No se encontró el número de radicación en la hoja Cabeza', true); return; }
+
+        cruceXLSNoPlanilla = noPlanilla;
+        cruceXLSPeriodo    = periodo;
+
+        // ── 2. Hoja TOTALES A PAGAR ────────────────────────
+        const wsTotales = wb.Sheets['TOTALES A PAGAR'];
+        let salud = 0, pension = 0, riesgos = 0, caja = 0;
+        if (wsTotales) {
+          const totRows = XLSX.utils.sheet_to_json(wsTotales, { header: 1, raw: true });
+          // fila 3 (índice 3): SALUD(0), PENSIÓN(1), RIESGOS(2), CAJAS(3)
+          if (totRows[3]) {
+            salud   = Number(totRows[3][0]) || 0;
+            pension = Number(totRows[3][1]) || 0;
+            riesgos = Number(totRows[3][2]) || 0;
+            caja    = Number(totRows[3][3]) || 0;
+          }
+        }
+        const totalPlanilla = salud + pension + riesgos + caja;
+        cruceXLSTotales = { salud, pension, riesgos, caja, total: totalPlanilla };
+
+        // ── 3. Hoja Detalle Planilla → CCs ─────────────────
+        const wsDetalle = wb.Sheets['Detalle Planilla'];
+        if (!wsDetalle) { mostrarToast('⚠️ No se encontró la hoja "Detalle Planilla"', true); return; }
+        const detRows = XLSX.utils.sheet_to_json(wsDetalle, { header: 1, raw: true, defval: '' });
+        // Encabezado en fila índice 2, datos desde fila 3
+        // col 1 = NÚMERO IDENTIFICACIÓN, col 4 = PRIMER NOMBRE, col 6 = PRIMER APELLIDO
+        const afiliados = []; // { cc, nombre }
+        for (let i = 3; i < detRows.length; i++) {
+          const r = detRows[i];
+          const cc = r[1] ? String(r[1]).trim() : '';
+          if (!cc || cc === '') continue;
+          const nombre = [r[4], r[5], r[6], r[7]].filter(Boolean).join(' ').trim();
+          afiliados.push({ cc, nombre });
+        }
+
+        if (afiliados.length === 0) { mostrarToast('⚠️ No se encontraron afiliados en el Detalle Planilla', true); return; }
+
+        // ── 4. Buscar CIs en ingreso_programa por CC ───────
+        const ccs = afiliados.map(a => a.cc);
+        const { data: registros, error } = await sb
+          .from('ingreso_programa')
+          .select('id, recibo, cc, afiliado, detalle, total, total_ss, eps_val, arl_val, afp_val, ccf_val, fsp, admon, banco')
+          .in('cc', ccs)
+          .neq('banco', 'Retiros');
+
+        if (error) { mostrarToast('Error buscando en programa: ' + error.message, true); return; }
+
+        // Indexar por CC para cruce rápido
+        const porCC = {};
+        (registros || []).forEach(r => {
+          if (!porCC[r.cc]) porCC[r.cc] = [];
+          porCC[r.cc].push(r);
+        });
+
+        crucePlanillaData = registros || [];
+
+        // ── 5. Asignar número de planilla en ingreso_programa ─
+        // Solo a los registros que aún no tienen planilla asignada
+        const sinPlanilla = crucePlanillaData.filter(r => !r.planilla || r.planilla === '');
+        if (sinPlanilla.length > 0) {
+          const ids = sinPlanilla.map(r => r.id);
+          const { error: eUpd } = await sb
+            .from('ingreso_programa')
+            .update({ planilla: noPlanilla })
+            .in('id', ids);
+          if (eUpd) console.warn('Error actualizando planilla en ingreso_programa:', eUpd.message);
+          else sinPlanilla.forEach(r => { r.planilla = noPlanilla; });
+        }
+
+        // ── 6. Actualizar numero_planilla en el movimiento ─
+        const m = movimientos.find(x => String(x.id) === String(contabMovId));
+        if (m && (!m.numero_planilla || m.numero_planilla === '')) {
+          await guardarCampo(contabMovId, 'numero_planilla', noPlanilla);
+          document.getElementById('contabPlanilla').value = noPlanilla;
+        }
+
+        // ── 7. Renderizar resultado ────────────────────────
+        mostrarResultadoCruce(afiliados, porCC, noPlanilla, periodo, totalPlanilla, salud, pension, riesgos, caja);
+
+      } catch(err) {
+        mostrarToast('Error procesando archivo: ' + err.message, true);
+        console.error(err);
+      }
+    };
+    reader.readAsArrayBuffer(archivo);
+  }
+
+  function mostrarResultadoCruce(afiliados, porCC, noPlanilla, periodo, totalPlanilla, salud, pension, riesgos, caja) {
+    document.getElementById('peNoPlanilla').textContent = noPlanilla;
+    document.getElementById('pePeriodo').textContent    = periodo;
+    document.getElementById('peCantAfil').textContent   = afiliados.length;
+    document.getElementById('peTotSalud').textContent   = formatCOP(salud);
+    document.getElementById('peTotPension').textContent = formatCOP(pension);
+    document.getElementById('peTotRiesgos').textContent = formatCOP(riesgos);
+    document.getElementById('peTotCaja').textContent    = formatCOP(caja);
+    document.getElementById('peTotPlanilla').textContent = formatCOP(totalPlanilla);
+    document.getElementById('peMontoBanco2').textContent = formatCOP(peMontoMovimiento);
+
+    const diff = peMontoMovimiento - totalPlanilla;
+    const diffEl = document.getElementById('peDiffBanco');
+    diffEl.textContent = Math.abs(diff) < 1 ? '✅ Cuadra' : (diff >= 0 ? '+' : '') + formatCOP2(diff);
+    diffEl.style.color = Math.abs(diff) < 1 ? 'var(--accent)' : 'var(--danger)';
+
+    // Tabla de cruce
+    let encontrados = 0, sinCI = [];
+    let tbodyHTML = '';
+    afiliados.forEach(a => {
+      const regs = porCC[a.cc] || [];
+      if (regs.length > 0) {
+        encontrados++;
+        regs.forEach((r, ri) => {
+          tbodyHTML += '<tr style="border-bottom:1px solid #f1f3f5;background:' + (ri===0?'':'#fafafa') + ';">'
+            + (ri===0 ? '<td style="padding:6px 10px;font-size:0.78rem;">' + a.cc + '</td>'
+                      + '<td style="padding:6px 10px;font-size:0.78rem;color:var(--muted);">' + a.nombre + '</td>'
+                      : '<td colspan="2" style="padding:6px 10px;font-size:0.73rem;color:var(--muted);">↳ también</td>')
+            + '<td style="padding:6px 10px;color:var(--accent);font-weight:600;font-size:0.78rem;">CI-' + r.recibo + '</td>'
+            + '<td style="padding:6px 10px;font-size:0.78rem;">' + (r.afiliado || '—') + '</td>'
+            + '<td style="padding:6px 10px;text-align:right;font-weight:600;">' + formatCOP(r.total_ss || 0) + '</td>'
+            + '</tr>';
+        });
+      } else {
+        sinCI.push(a);
+        tbodyHTML += '<tr style="border-bottom:1px solid #f1f3f5;background:#fef2f2;">'
+          + '<td style="padding:6px 10px;font-size:0.78rem;">' + a.cc + '</td>'
+          + '<td style="padding:6px 10px;font-size:0.78rem;color:var(--muted);">' + a.nombre + '</td>'
+          + '<td colspan="3" style="padding:6px 10px;font-size:0.78rem;color:var(--danger);">⚠️ Sin CI en Ingreso Programa</td>'
+          + '</tr>';
+      }
+    });
+    document.getElementById('peCruceTabla').innerHTML = tbodyHTML;
+    document.getElementById('peCruceResumen').textContent =
+      encontrados + ' de ' + afiliados.length + ' encontrados';
+    document.getElementById('peCruceResumen').style.color =
+      encontrados === afiliados.length ? 'var(--accent)' : 'var(--danger)';
+
+    if (sinCI.length > 0) {
+      document.getElementById('peSinCIMsg').innerHTML =
+        '⚠️ ' + sinCI.length + ' afiliado(s) de la planilla no tienen CI en Ingreso Programa: '
+        + sinCI.map(a => '<strong>' + a.cc + '</strong>').join(', ');
+    } else {
+      document.getElementById('peSinCIMsg').innerHTML = '';
+    }
+
+    document.getElementById('peStep1').style.display = 'none';
+    document.getElementById('peStep2').style.display = 'block';
+    document.getElementById('peBtnVolver').style.display = 'inline-block';
+    document.getElementById('peBtnUsar').style.display   = 'inline-block';
+    document.getElementById('peFooterMsg').textContent   =
+      'Se asignó planilla ' + noPlanilla + ' a ' + crucePlanillaData.filter(r => !r._skip).length + ' CIs en Ingreso Programa';
+
+    mostrarToast('✅ Planilla procesada: ' + encontrados + '/' + afiliados.length + ' CIs encontrados');
+  }
+
+  function usarCruceEnComprobante() {
+    const m = movimientos.find(x => String(x.id) === String(contabMovId));
+    const abs = Math.abs(Number(m ? m.monto : 0));
+    const cuenta  = m ? m.cuenta : '';
+    const pucBanco = BANCO_PUC[cuenta] || '11200505';
+    const descBanco = PUC[pucBanco] || cuenta;
+
+    // Acumular desglose desde los registros encontrados en ingreso_programa
+    let eps = 0, arl = 0, afp = 0, ccf = 0, fsp = 0;
+    crucePlanillaData.forEach(r => {
+      eps += Number(r.eps_val || 0);
+      arl += Number(r.arl_val || 0);
+      afp += Number(r.afp_val || 0);
+      ccf += Number(r.ccf_val || 0);
+      fsp += Number(r.fsp    || 0);
+    });
+
+    // Si no hay desglose de CIs, usar los totales de la planilla XLS
+    if (eps + arl + afp + ccf + fsp < 1 && cruceXLSTotales.total > 0) {
+      eps = cruceXLSTotales.salud;   // salud ≈ EPS
+      afp = cruceXLSTotales.pension; // pensión ≈ AFP (simplificado)
+      arl = cruceXLSTotales.riesgos;
+      ccf = cruceXLSTotales.caja;
+    }
+
+    contabLineasData = [];
+    contabLineasData.push({ puc: pucBanco, desc: descBanco, deb: 0, cred: abs });
+    if (eps > 0) contabLineasData.push({ puc: '28150501', desc: 'EPS por pagar',  deb: eps, cred: 0 });
+    if (arl > 0) contabLineasData.push({ puc: '28150502', desc: 'ARL por pagar',  deb: arl, cred: 0 });
+    if (afp > 0) contabLineasData.push({ puc: '28150503', desc: 'AFP por pagar',  deb: afp, cred: 0 });
+    if (ccf > 0) contabLineasData.push({ puc: '28150504', desc: 'CCF por pagar',  deb: ccf, cred: 0 });
+    if (fsp > 0) contabLineasData.push({ puc: '28150510', desc: 'FSP por pagar',  deb: fsp, cred: 0 });
+
+    // Actualizar número planilla en encabezado del comprobante
+    if (cruceXLSNoPlanilla) {
+      document.getElementById('contabPlanilla').value = cruceXLSNoPlanilla;
+    }
+
+    renderLineasContab();
+    cerrarPlanillaEgreso();
+    mostrarToast('✓ Comprobante cargado — planilla ' + cruceXLSNoPlanilla + ' — ' + crucePlanillaData.length + ' CIs');
+  }
+
   // Extrae el número CI del texto del recibo (ej: "01. Mar No._CI-00000021627-..." → "00000021627")
   function extraerCI(recibo) {
     if (!recibo) return null;
@@ -886,13 +1416,38 @@
     contabMovId = id;
 
     const prog = m.recibo ? buscarEnCache(m.recibo) : null;
+    const tieneCI = m.recibo && m.recibo.toUpperCase().includes('CI-');
 
     // Encabezado
-    document.getElementById('contabRecibo').textContent  = m.recibo || '—';
-    document.getElementById('contabCC').textContent      = prog ? prog.cc || '—' : '—';
+    document.getElementById('contabRecibo').textContent   = m.recibo || '—';
+    document.getElementById('contabCC').textContent       = prog ? prog.cc || '—' : '—';
     document.getElementById('contabAfiliado').textContent = prog ? prog.afiliado || '—' : (m.descripcion || '—');
-    document.getElementById('contabPlanilla').value      = m.numero_planilla || '';
-    document.getElementById('contabEstado').textContent  = m.contabilizado ? '✅ Ya contabilizado' : '';
+    document.getElementById('contabPlanilla').value       = m.numero_planilla || '';
+    document.getElementById('contabEstado').textContent   = m.contabilizado ? '✅ Ya contabilizado' : '';
+
+    // Botón buscar/crear tercero — solo si no tiene CI
+    let btnTerceroHTML = '';
+    if (!tieneCI) {
+      btnTerceroHTML = '<button onclick="abrirTercero()" style="margin-left:8px;padding:3px 10px;border-radius:5px;border:1px solid var(--accent);background:white;color:var(--accent);font-size:0.78rem;cursor:pointer;">👤 Asignar tercero</button>';
+    }
+    // Inyectar botón junto al campo CC
+    const ccCell = document.getElementById('contabCC');
+    ccCell.insertAdjacentHTML('afterend', '<span id="btnTerceroSlot"></span>');
+    const slot = document.getElementById('btnTerceroSlot');
+    if (slot) slot.innerHTML = btnTerceroHTML;
+
+    // Botón cruce planilla — solo si es egreso de Planillas Pagadas
+    const esPlanillaPagada = m.concepto === 'Planillas Pagadas' && Number(m.monto) < 0;
+    let btnCruceHTML = '';
+    if (esPlanillaPagada) {
+      btnCruceHTML = '<button onclick="abrirCruceEgreso(' + Math.abs(Number(m.monto)) + ')" '
+        + 'style="margin-left:8px;padding:3px 10px;border-radius:5px;border:1px solid #2563eb;background:white;color:#2563eb;font-size:0.78rem;cursor:pointer;">📂 Subir planilla UGPP</button>';
+    }
+    const planillaInput = document.getElementById('contabPlanilla');
+    // Limpiar slot anterior si existe
+    const oldSlot = document.getElementById('btnCruceSlot');
+    if (oldSlot) oldSlot.remove();
+    planillaInput.insertAdjacentHTML('afterend', '<span id="btnCruceSlot">' + btnCruceHTML + '</span>');
 
     // Generar líneas
     contabLineasData = generarLineasAuto(m, prog);
@@ -942,12 +1497,13 @@
       }
 
     } else if (m.concepto === 'Planillas Pagadas' && monto < 0) {
-      // EGRESO planilla
+      // EGRESO planilla — línea genérica hasta hacer cruce UGPP
       lineas.push({ puc: pucBanco, desc: descBanco,   deb: 0,   cred: abs });
-      lineas.push({ puc: '28150501', desc: 'EPS',     deb: 0,   cred: 0 });
-      lineas.push({ puc: '28150502', desc: 'ARL',     deb: 0,   cred: 0 });
-      lineas.push({ puc: '28150503', desc: 'AFP',     deb: 0,   cred: 0 });
-      lineas.push({ puc: '28150504', desc: 'CCF',     deb: 0,   cred: 0 });
+      lineas.push({ puc: '28150501', desc: 'EPS por pagar',  deb: 0, cred: 0 });
+      lineas.push({ puc: '28150502', desc: 'ARL por pagar',  deb: 0, cred: 0 });
+      lineas.push({ puc: '28150503', desc: 'AFP por pagar',  deb: 0, cred: 0 });
+      lineas.push({ puc: '28150504', desc: 'CCF por pagar',  deb: 0, cred: 0 });
+      lineas.push({ puc: '28150510', desc: 'FSP por pagar',  deb: 0, cred: 0 });
 
     } else {
       // Otros
@@ -1069,6 +1625,11 @@
     document.getElementById('modalContab').style.display = 'none';
     contabMovId = null;
     contabLineasData = [];
+    // Limpiar slots dinámicos
+    const s1 = document.getElementById('btnTerceroSlot');
+    const s2 = document.getElementById('btnCruceSlot');
+    if (s1) s1.remove();
+    if (s2) s2.remove();
   }
 
   // Cerrar modal al hacer clic fuera
