@@ -130,6 +130,12 @@
     font-size: 0.95rem; padding: 2px 5px; border-radius: 4px; transition: color 0.15s;
   }
   .btn-del:hover { color: var(--danger); }
+  .btn-contab {
+    background: none; border: none; color: #9ca3af; cursor: pointer;
+    font-size: 0.88rem; padding: 2px 5px; border-radius: 4px; transition: color 0.15s;
+  }
+  .btn-contab:hover { color: var(--accent); }
+  .btn-contab.contabilizado { color: var(--accent); }
 
   .empty-state { text-align: center; padding: 50px 20px; color: var(--muted); }
   .empty-state .icon { font-size: 2.5rem; margin-bottom: 10px; }
@@ -275,7 +281,8 @@
           <col style="width:220px">
           <col style="width:75px">
           <col style="width:130px">
-          <col style="width:32px">
+          <col style="width:28px">
+          <col style="width:28px">
         </colgroup>
         <thead>
           <tr>
@@ -288,6 +295,7 @@
             <th onclick="sortBy('recibo')" id="th-recibo">Recibo</th>
             <th onclick="sortBy('numero_planilla')" id="th-planilla">No.</th>
             <th onclick="sortBy('concepto')" id="th-concepto">Concepto</th>
+            <th title="Contabilizar">📒</th>
             <th></th>
           </tr>
         </thead>
@@ -310,6 +318,64 @@
     <div class="modal-actions">
       <button class="btn btn-secondary" onclick="cancelarImportacion()">Cancelar</button>
       <button class="btn btn-primary" id="btnImportar" onclick="confirmarImport()">Importar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Contabilizar -->
+<div class="modal-overlay" id="modalContab" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:3000;align-items:center;justify-content:center;">
+  <div style="background:white;border-radius:12px;width:95%;max-width:820px;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,0.3);">
+    <div style="padding:16px 24px;background:var(--header-bg);color:white;border-radius:12px 12px 0 0;display:flex;justify-content:space-between;align-items:center;">
+      <h3 style="font-size:1rem;font-weight:700;" id="contabTitulo">Comprobante Contable</h3>
+      <button onclick="cerrarContabilizar()" style="background:none;border:none;color:white;font-size:1.2rem;cursor:pointer;">✕</button>
+    </div>
+    <div style="overflow-y:auto;flex:1;padding:20px 24px;">
+      <!-- Info del movimiento -->
+      <div style="background:#f8fafc;border-radius:8px;padding:12px 16px;margin-bottom:16px;font-size:0.85rem;display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;" id="contabInfo"></div>
+      <!-- Número de planilla -->
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
+        <label style="font-size:0.85rem;font-weight:600;color:var(--muted);white-space:nowrap;">N° Planilla UGPP:</label>
+        <input type="text" id="contabPlanilla" placeholder="Ej: 36709831" 
+          style="border:1px solid var(--border);border-radius:6px;padding:6px 12px;font-size:0.85rem;width:200px;">
+        <span style="font-size:0.78rem;color:var(--muted);">Para cruzar con el pago a entidades</span>
+      </div>
+      <!-- Tabla de movimientos contables -->
+      <table style="width:100%;border-collapse:collapse;font-size:0.82rem;margin-bottom:12px;">
+        <thead>
+          <tr style="background:#f8fafc;">
+            <th style="padding:8px 10px;text-align:left;font-size:0.7rem;font-weight:700;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border);">Cuenta PUC</th>
+            <th style="padding:8px 10px;text-align:left;font-size:0.7rem;font-weight:700;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border);">Descripción</th>
+            <th style="padding:8px 10px;text-align:right;font-size:0.7rem;font-weight:700;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border);">Débito</th>
+            <th style="padding:8px 10px;text-align:right;font-size:0.7rem;font-weight:700;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border);">Crédito</th>
+            <th style="padding:8px 10px;border-bottom:1px solid var(--border);width:30px;"></th>
+          </tr>
+        </thead>
+        <tbody id="contabLineas"></tbody>
+        <tfoot>
+          <tr style="background:#f0fdf4;font-weight:700;">
+            <td colspan="2" style="padding:8px 10px;">TOTALES</td>
+            <td style="padding:8px 10px;text-align:right;color:var(--accent);" id="contabTotalDeb">$0</td>
+            <td style="padding:8px 10px;text-align:right;color:var(--accent);" id="contabTotalCred">$0</td>
+            <td></td>
+          </tr>
+          <tr>
+            <td colspan="5" style="padding:6px 10px;text-align:right;">
+              <span id="contabDiff" style="font-size:0.82rem;font-weight:700;"></span>
+            </td>
+          </tr>
+        </tfoot>
+      </table>
+      <!-- Botón agregar línea -->
+      <button onclick="agregarLineaContab()" style="background:none;border:1px dashed var(--border);border-radius:6px;padding:6px 14px;font-size:0.82rem;color:var(--muted);cursor:pointer;width:100%;margin-bottom:16px;">
+        + Agregar línea
+      </button>
+    </div>
+    <div style="padding:14px 24px;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;">
+      <span style="font-size:0.8rem;color:var(--muted);" id="contabEstado"></span>
+      <div style="display:flex;gap:10px;">
+        <button onclick="cerrarContabilizar()" style="padding:8px 18px;border-radius:7px;border:1px solid var(--border);background:white;cursor:pointer;font-size:0.85rem;">Cancelar</button>
+        <button onclick="guardarComprobante()" style="padding:8px 18px;border-radius:7px;border:none;background:var(--accent);color:white;cursor:pointer;font-size:0.85rem;font-weight:600;">💾 Guardar comprobante</button>
+      </div>
     </div>
   </div>
 </div>
@@ -728,6 +794,231 @@
     if (campo !== 'monto') mostrarToast('✓ Guardado');
   }
 
+  // ── PUC ──────────────────────────────────────────────────
+  const PUC = {
+    '11050502': 'Caja Neiva',
+    '11050503': '186-000339-28',
+    '11050504': 'Bancolombia a la Mano',
+    '11050505': 'Nequi',
+    '11050506': 'Recaudo SION',
+    '11050507': 'Independientes',
+    '11050508': 'Daviplata',
+    '11200501': 'Avvillas Recaudo',
+    '11200502': 'Avvillas Incapacidades',
+    '11200505': 'Bancolombia SION UCE',
+    '28150501': 'EPS por pagar',
+    '28150502': 'ARL por pagar',
+    '28150503': 'AFP por pagar',
+    '28150504': 'CCF por pagar',
+    '28150505': 'Comisiones por pagar',
+    '28150506': 'Incapacidad General',
+    '28150508': 'Licencia Maternidad',
+    '28150509': 'Incapacidad Laboral',
+    '28150510': 'FSP por pagar',
+    '41701001': 'Sostenibilidad',
+    '41701002': 'Intereses',
+    '42100501': 'Abono Intereses',
+  };
+
+  // Mapa cuenta banco → código PUC
+  const BANCO_PUC = {
+    'BANCOLOMBIA SION': '11200505',
+    'Banco SION':       '11200505',
+    'DAVIPLATA':        '11050508',
+    'Daviplata':        '11050508',
+    'INDEPENDIENTES':   '11050507',
+    'Independientes':   '11050507',
+  };
+
+  let contabMovId    = null;
+  let contabLineasData = [];
+
+  function abrirContabilizar(id) {
+    const m = movimientos.find(x => String(x.id) === String(id));
+    if (!m) return;
+    contabMovId = id;
+
+    // Título
+    document.getElementById('contabTitulo').textContent =
+      `Comprobante — ${m.fecha} | ${m.descripcion || ''} | ${formatCOP(Math.abs(m.monto))}`;
+
+    // Info del movimiento
+    document.getElementById('contabInfo').innerHTML =
+      `<div><span style="color:var(--muted);font-size:0.75rem;">FECHA</span><br><strong>${m.fecha}</strong></div>
+       <div><span style="color:var(--muted);font-size:0.75rem;">CONCEPTO</span><br><strong>${m.concepto || '—'}</strong></div>
+       <div><span style="color:var(--muted);font-size:0.75rem;">MONTO</span><br><strong style="color:${m.monto>=0?'var(--credit)':'var(--debit)'}">${formatCOP(m.monto)}</strong></div>`;
+
+    // Planilla
+    document.getElementById('contabPlanilla').value = m.numero_planilla || '';
+
+    // Generar líneas automáticas según concepto
+    contabLineasData = generarLineasAuto(m);
+    renderLineasContab();
+
+    // Mostrar modal
+    const modal = document.getElementById('modalContab');
+    modal.style.display = 'flex';
+  }
+
+  function generarLineasAuto(m) {
+    const lineas = [];
+    const monto  = Number(m.monto);
+    const abs    = Math.abs(monto);
+    const cuenta = m.cuenta || '';
+
+    // Cuenta del banco según la cuenta seleccionada
+    const pucBanco = BANCO_PUC[cuenta] || '11200505';
+    const descBanco = PUC[pucBanco] || cuenta;
+
+    // Buscar datos de ingreso programa si tiene CI-
+    const prog = m.recibo ? cachePrograma[m.recibo] : null;
+
+    if (m.concepto === 'Seguridad Social' && monto > 0) {
+      // INGRESO — débito banco, créditos SS + admon
+      lineas.push({ puc: pucBanco, desc: descBanco,     deb: abs,  cred: 0,   editable: false });
+
+      if (prog) {
+        const detalle = String(prog.detalle || '').toUpperCase();
+        if (detalle.includes('ADMISI')) {
+          // Admisión: comisión = total - 67650, sostenibilidad = 67650
+          lineas.push({ puc: '28150505', desc: 'Comisiones por pagar', deb: 0, cred: abs - 67650, editable: false });
+          lineas.push({ puc: '41701001', desc: 'Sostenibilidad',        deb: 0, cred: 67650,       editable: false });
+        } else if (detalle.includes('REINGRESO') || detalle.includes('REINTEGRO')) {
+          // Reintegro: comisión = 67650, sostenibilidad = total - 67650
+          lineas.push({ puc: '28150505', desc: 'Comisiones por pagar', deb: 0, cred: 67650,       editable: false });
+          lineas.push({ puc: '41701001', desc: 'Sostenibilidad',        deb: 0, cred: abs - 67650, editable: false });
+        } else {
+          // Permanencia
+          if (Number(prog.eps_val)  > 0) lineas.push({ puc: '28150501', desc: 'EPS por pagar',  deb: 0, cred: Number(prog.eps_val),  editable: false });
+          if (Number(prog.arl_val)  > 0) lineas.push({ puc: '28150502', desc: 'ARL por pagar',  deb: 0, cred: Number(prog.arl_val),  editable: false });
+          if (Number(prog.afp_val)  > 0) lineas.push({ puc: '28150503', desc: 'AFP por pagar',  deb: 0, cred: Number(prog.afp_val),  editable: false });
+          if (Number(prog.ccf_val)  > 0) lineas.push({ puc: '28150504', desc: 'CCF por pagar',  deb: 0, cred: Number(prog.ccf_val),  editable: false });
+          if (Number(prog.fsp)      > 0) lineas.push({ puc: '28150510', desc: 'FSP por pagar',  deb: 0, cred: Number(prog.fsp),      editable: false });
+          if (Number(prog.admon)    > 0) lineas.push({ puc: '41701001', desc: 'Sostenibilidad', deb: 0, cred: Number(prog.admon),    editable: false });
+        }
+      } else {
+        // Sin CI conocido — dejar crédito manual
+        lineas.push({ puc: '', desc: 'SS por pagar', deb: 0, cred: abs, editable: true });
+      }
+
+    } else if (m.concepto === 'Planillas Pagadas' && monto < 0) {
+      // EGRESO planilla — crédito banco, débitos por entidad
+      lineas.push({ puc: pucBanco, desc: descBanco, deb: 0, cred: abs, editable: false });
+      lineas.push({ puc: '28150501', desc: 'EPS por pagar',  deb: 0, cred: 0, editable: true });
+      lineas.push({ puc: '28150502', desc: 'ARL por pagar',  deb: 0, cred: 0, editable: true });
+      lineas.push({ puc: '28150503', desc: 'AFP por pagar',  deb: 0, cred: 0, editable: true });
+      lineas.push({ puc: '28150504', desc: 'CCF por pagar',  deb: 0, cred: 0, editable: true });
+
+    } else {
+      // Otros — una línea débito y una crédito manuales
+      if (monto >= 0) {
+        lineas.push({ puc: pucBanco, desc: descBanco, deb: abs, cred: 0, editable: false });
+        lineas.push({ puc: '', desc: '',              deb: 0,   cred: abs, editable: true });
+      } else {
+        lineas.push({ puc: '', desc: '',              deb: abs, cred: 0,   editable: true });
+        lineas.push({ puc: pucBanco, desc: descBanco, deb: 0,   cred: abs, editable: false });
+      }
+    }
+    return lineas;
+  }
+
+  function renderLineasContab() {
+    const tbody = document.getElementById('contabLineas');
+    tbody.innerHTML = contabLineasData.map((l, i) => `
+      <tr style="border-bottom:1px solid #f1f3f5;">
+        <td style="padding:6px 8px;">
+          <input value="${l.puc}" placeholder="Cta PUC" data-idx="${i}" data-field="puc"
+            style="border:1px solid var(--border);border-radius:4px;padding:4px 6px;font-size:0.8rem;width:100px;"
+            onchange="updateLineaContab(${i},'puc',this.value)">
+        </td>
+        <td style="padding:6px 8px;">
+          <input value="${l.desc}" placeholder="Descripción" data-idx="${i}" data-field="desc"
+            style="border:1px solid var(--border);border-radius:4px;padding:4px 6px;font-size:0.8rem;width:100%;"
+            onchange="updateLineaContab(${i},'desc',this.value)">
+        </td>
+        <td style="padding:6px 8px;text-align:right;">
+          <input value="${l.deb > 0 ? l.deb : ''}" placeholder="0" type="number" min="0"
+            style="border:1px solid var(--border);border-radius:4px;padding:4px 6px;font-size:0.8rem;width:100px;text-align:right;"
+            onchange="updateLineaContab(${i},'deb',this.value)">
+        </td>
+        <td style="padding:6px 8px;text-align:right;">
+          <input value="${l.cred > 0 ? l.cred : ''}" placeholder="0" type="number" min="0"
+            style="border:1px solid var(--border);border-radius:4px;padding:4px 6px;font-size:0.8rem;width:100px;text-align:right;"
+            onchange="updateLineaContab(${i},'cred',this.value)">
+        </td>
+        <td style="padding:6px 8px;text-align:center;">
+          <button onclick="eliminarLineaContab(${i})" style="background:none;border:none;color:#d1d5db;cursor:pointer;font-size:0.9rem;" title="Eliminar línea">🗑</button>
+        </td>
+      </tr>`).join('');
+    actualizarTotalesContab();
+  }
+
+  function updateLineaContab(idx, field, val) {
+    if (field === 'deb' || field === 'cred') contabLineasData[idx][field] = parseFloat(val) || 0;
+    else contabLineasData[idx][field] = val;
+    actualizarTotalesContab();
+  }
+
+  function eliminarLineaContab(idx) {
+    contabLineasData.splice(idx, 1);
+    renderLineasContab();
+  }
+
+  function agregarLineaContab() {
+    contabLineasData.push({ puc: '', desc: '', deb: 0, cred: 0, editable: true });
+    renderLineasContab();
+  }
+
+  function actualizarTotalesContab() {
+    const totDeb  = contabLineasData.reduce((s,l) => s + (Number(l.deb)||0), 0);
+    const totCred = contabLineasData.reduce((s,l) => s + (Number(l.cred)||0), 0);
+    const diff    = totDeb - totCred;
+    document.getElementById('contabTotalDeb').textContent  = formatCOP(totDeb);
+    document.getElementById('contabTotalCred').textContent = formatCOP(totCred);
+    const diffEl = document.getElementById('contabDiff');
+    if (Math.abs(diff) < 1) {
+      diffEl.textContent = '✅ Comprobante cuadra';
+      diffEl.style.color = 'var(--accent)';
+    } else {
+      diffEl.textContent = `⚠️ Diferencia: ${formatCOP(diff)}`;
+      diffEl.style.color = 'var(--danger)';
+    }
+  }
+
+  async function guardarComprobante() {
+    const totDeb  = contabLineasData.reduce((s,l) => s + (Number(l.deb)||0), 0);
+    const totCred = contabLineasData.reduce((s,l) => s + (Number(l.cred)||0), 0);
+    if (Math.abs(totDeb - totCred) >= 1) {
+      mostrarToast('⚠️ El comprobante no cuadra — revisa los valores', true); return;
+    }
+    const planilla = document.getElementById('contabPlanilla').value.trim();
+
+    // Guardar número de planilla en el movimiento si se ingresó
+    if (planilla) {
+      await guardarCampo(contabMovId, 'numero_planilla', planilla);
+    }
+
+    // Marcar como contabilizado
+    await sb.from('movimientos').update({ contabilizado: true }).eq('id', contabMovId);
+    const idx = movimientos.findIndex(m => String(m.id) === String(contabMovId));
+    if (idx !== -1) movimientos[idx].contabilizado = true;
+
+    mostrarToast('✅ Comprobante guardado');
+    cerrarContabilizar();
+    renderTabla();
+  }
+
+  function cerrarContabilizar() {
+    document.getElementById('modalContab').style.display = 'none';
+    contabMovId = null;
+    contabLineasData = [];
+  }
+
+  // Cerrar modal al hacer clic fuera
+  document.getElementById('modalContab').addEventListener('click', function(e) {
+    if (e.target === this) cerrarContabilizar();
+  });
+
   function sortBy(col) {
     if (sortCol === col) sortDir *= -1;
     else { sortCol = col; sortDir = 1; }
@@ -849,6 +1140,7 @@
             ${CONCEPTOS.map(c=>`<option ${c===m.concepto?'selected':''}>${c}</option>`).join('')}
           </select>
         </td>
+        <td><button class="btn-contab ${m.contabilizado?'contabilizado':''}" onclick="abrirContabilizar('${m.id}')" title="${m.contabilizado?'Ver comprobante':'Contabilizar'}">📒</button></td>
         <td><button class="btn-del" onclick="eliminar('${m.id}')" title="Eliminar">🗑</button></td>
       </tr>`;
     }).join('');
