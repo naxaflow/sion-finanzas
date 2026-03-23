@@ -1220,57 +1220,97 @@
         cruceXLSNoPlanilla = noPlanilla;
         cruceXLSPeriodo    = periodo;
 
-        // ── 2. Hojas de totales → una línea por entidad ────
-        // col 0 = nombre entidad (XLS), col 1 = NIT, col 4 = valor cotización
-        const HOJAS_ENTIDAD = [
-          { hoja: 'Totales Salud',   puc: '28150501', colValor: 4 },
-          { hoja: 'Totales Pension', puc: '28150503', colValor: 5 }, // col 5 = VALOR TOTAL COTIZACIONES OBLIGATORIAS
-          { hoja: 'Totales Riesgos', puc: '28150502', colValor: 4 },
-          { hoja: 'Totales Cajas',   puc: '28150504', colValor: 4 },
-        ];
-        const entidades = [];
-        let totalPlanilla = 0;
-
-        for (const cfg of HOJAS_ENTIDAD) {
-          const ws = wb.Sheets[cfg.hoja];
-          if (!ws) continue;
-          const rows = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: '' });
-          // datos desde fila índice 3
-          for (let i = 3; i < rows.length; i++) {
-            const r = rows[i];
-            const nombreRaw = r[0] ? String(r[0]).trim() : '';
-            const nit       = r[1] ? String(r[1]).trim().replace(/\D/g, '') : '';
-            const valor     = Number(r[cfg.colValor]) || 0;
-            if (!nombreRaw || valor <= 0) continue;
-            if (nombreRaw.toLowerCase().startsWith('sin ')) continue;
-            entidades.push({
-              puc:    cfg.puc,
-              nit,
-              nombre: nombreEntidad(nit, nombreRaw),
-              valor,
-            });
-            totalPlanilla += valor;
-          }
-        }
-
-        if (entidades.length === 0) { mostrarToast('⚠️ No se encontraron entidades con valor en las hojas de totales', true); return; }
-        cruceXLSTotales = { entidades, total: totalPlanilla };
-
-        // ── 3. Hoja Detalle Planilla → CCs afiliados ───────
+        // ── 2. Hoja Detalle Planilla → acumular por entidad ─
+        // Columnas de valor (datos desde fila índice 3):
+        // col 1  = CC  | col 14 = NOMBRE EPS  | col 16 = NOMBRE AFP
+        // col 18 = NOMBRE CCF  | col 20 = NOMBRE ARL
+        // col 70 = COT. TOTAL PENSIÓN (AFP)
+        // col 75 = COT. OBLIGATORIA SALUD (EPS)
+        // col 85 = COT. OBLIGATORIA A RIESGOS (ARL)
+        // col 93 = APORTE CCF
         const wsDetalle = wb.Sheets['Detalle Planilla'];
         if (!wsDetalle) { mostrarToast('⚠️ No se encontró la hoja "Detalle Planilla"', true); return; }
         const detRows = XLSX.utils.sheet_to_json(wsDetalle, { header: 1, raw: true, defval: '' });
+
+        const acumEPS = {}, acumAFP = {}, acumARL = {}, acumCCF = {};
         const afiliados = [];
+
         for (let i = 3; i < detRows.length; i++) {
           const r = detRows[i];
           const cc = r[1] ? String(r[1]).trim() : '';
           if (!cc) continue;
           const nombre = [r[4], r[5], r[6], r[7]].filter(Boolean).join(' ').trim();
           afiliados.push({ cc, nombre });
-        }
-        if (afiliados.length === 0) { mostrarToast('⚠️ No se encontraron afiliados en el Detalle Planilla', true); return; }
 
-        // ── 4. Buscar CIs en ingreso_programa por CC ───────
+          const vPension = Number(r[70]) || 0;
+          const vSalud   = Number(r[75]) || 0;
+          const vARL     = Number(r[85]) || 0;
+          const vCCF     = Number(r[93]) || 0;
+
+          const nomEPS = String(r[14] || '').trim();
+          const nomAFP = String(r[16] || '').trim();
+          const nomARL = String(r[20] || '').trim();
+          const nomCCF = String(r[18] || '').trim();
+
+          if (vSalud > 0 && nomEPS && !nomEPS.toLowerCase().startsWith('sin ')) {
+            if (!acumEPS[nomEPS]) acumEPS[nomEPS] = 0;
+            acumEPS[nomEPS] += vSalud;
+          }
+          if (vPension > 0 && nomAFP && !nomAFP.toLowerCase().startsWith('sin ')) {
+            if (!acumAFP[nomAFP]) acumAFP[nomAFP] = 0;
+            acumAFP[nomAFP] += vPension;
+          }
+          if (vARL > 0 && nomARL && !nomARL.toLowerCase().startsWith('sin ')) {
+            if (!acumARL[nomARL]) acumARL[nomARL] = 0;
+            acumARL[nomARL] += vARL;
+          }
+          if (vCCF > 0 && nomCCF && !nomCCF.toLowerCase().startsWith('sin ')) {
+            if (!acumCCF[nomCCF]) acumCCF[nomCCF] = 0;
+            acumCCF[nomCCF] += vCCF;
+          }
+        }
+
+        if (afiliados.length === 0) { mostrarToast('⚠️ No se encontraron afiliados en Detalle Planilla', true); return; }
+
+        // ── 3. Obtener NITs desde hojas de Totales ─────────
+        // mapa nombreXLS → NIT para asignar NIT correcto a cada entidad
+        const nitPorNombre = {};
+        for (const h of ['Totales Salud','Totales Pension','Totales Riesgos','Totales Cajas']) {
+          const ws = wb.Sheets[h];
+          if (!ws) continue;
+          const rows = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: '' });
+          for (let i = 3; i < rows.length; i++) {
+            const nom = String(rows[i][0] || '').trim();
+            const nit = String(rows[i][1] || '').trim().replace(/\D/g, '');
+            if (nom && nit) nitPorNombre[nom] = nit;
+          }
+        }
+
+        // ── 4. Construir array entidades con PUC + NIT ─────
+        const entidades = [];
+        const agregarEntidades = (acum, puc) => {
+          Object.entries(acum).forEach(([nombreXLS, valor]) => {
+            let nit = nitPorNombre[nombreXLS] || '';
+            // Fallback: buscar coincidencia parcial si nombre no coincide exacto
+            if (!nit) {
+              const clave = Object.keys(nitPorNombre).find(k =>
+                k.toLowerCase().includes(nombreXLS.toLowerCase().slice(0,8)) ||
+                nombreXLS.toLowerCase().includes(k.toLowerCase().slice(0,8))
+              );
+              if (clave) nit = nitPorNombre[clave];
+            }
+            entidades.push({ puc, nit, nombre: nombreEntidad(nit, nombreXLS), valor });
+          });
+        };
+        agregarEntidades(acumEPS, '28150501');
+        agregarEntidades(acumAFP, '28150503');
+        agregarEntidades(acumARL, '28150502');
+        agregarEntidades(acumCCF, '28150504');
+
+        const totalDetalle = entidades.reduce((s, e) => s + e.valor, 0);
+        cruceXLSTotales = { entidades, total: totalDetalle };
+
+        // ── 5. Buscar CIs en ingreso_programa por CC ───────
         const ccs = afiliados.map(a => a.cc);
         const { data: registros, error } = await sb
           .from('ingreso_programa')
@@ -1286,7 +1326,7 @@
         });
         crucePlanillaData = registros || [];
 
-        // ── 5. Asignar número de planilla en ingreso_programa ─
+        // ── 6. Asignar número de planilla en ingreso_programa ─
         const sinPlanilla = crucePlanillaData.filter(r => !r.planilla || r.planilla === '');
         if (sinPlanilla.length > 0) {
           const ids = sinPlanilla.map(r => r.id);
@@ -1294,15 +1334,15 @@
           if (!eUpd) sinPlanilla.forEach(r => { r.planilla = noPlanilla; });
         }
 
-        // ── 6. Actualizar numero_planilla en el movimiento ─
+        // ── 7. Actualizar numero_planilla en el movimiento ─
         const m = movimientos.find(x => String(x.id) === String(contabMovId));
         if (m && (!m.numero_planilla || m.numero_planilla === '')) {
           await guardarCampo(contabMovId, 'numero_planilla', noPlanilla);
           document.getElementById('contabPlanilla').value = noPlanilla;
         }
 
-        // ── 7. Renderizar resultado ────────────────────────
-        mostrarResultadoCruce(afiliados, porCC, noPlanilla, periodo, entidades, totalPlanilla);
+        // ── 8. Renderizar resultado ────────────────────────
+        mostrarResultadoCruce(afiliados, porCC, noPlanilla, periodo, entidades, totalDetalle);
 
       } catch(err) {
         mostrarToast('Error procesando archivo: ' + err.message, true);
