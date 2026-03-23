@@ -1132,9 +1132,36 @@
     mostrarToast('✅ Tercero creado y asignado');
   }
 
+  // ── Catálogo de entidades de seguridad social ─────────────
+  // NIT → { tipo, nombre } — actualizar si SION UCE agrega nuevas entidades
+  const ENTIDADES_PAGO = {
+    '900156264': { tipo: 'EPS', nombre: 'NUEVA EPS'           },
+    '800251440': { tipo: 'EPS', nombre: 'SANITAS S.A. E.P.S.' },
+    '900298372': { tipo: 'EPS', nombre: 'CAPITAL SALUD EPS-S' },
+    '830003564': { tipo: 'EPS', nombre: 'FAMISANAR CAFAM'     },
+    '860066942': { tipo: 'EPS', nombre: 'COMPENSAR EPS'       },
+    '901037916': { tipo: 'EPS', nombre: 'ADRES'               },
+    '900935126': { tipo: 'EPS', nombre: 'ASMET SALUD'         },
+    '800130907': { tipo: 'EPS', nombre: 'SALUD TOTAL S.A.'    },
+    '860002183': { tipo: 'ARL', nombre: 'COLPATRIA ARL'       },
+    '860011153': { tipo: 'ARL', nombre: 'POSITIVA ARL'        },
+    '800088702': { tipo: 'ARL', nombre: 'ARL SURA'            },
+    '800224808': { tipo: 'AFP', nombre: 'PORVENIR S.A.'       },
+    '800229739': { tipo: 'AFP', nombre: 'PROTECCION S.A.'     },
+    '900336004': { tipo: 'AFP', nombre: 'COLPENSIONES'        },
+    '800227940': { tipo: 'AFP', nombre: 'COLFONDOS'           },
+    '891180008': { tipo: 'CCF', nombre: 'COMFAMILIAR HUILA'   },
+  };
+
+  function nombreEntidad(nit, nombreXLS) {
+    const n = String(nit || '').trim().replace(/\D/g, '');
+    if (n && ENTIDADES_PAGO[n]) return n + ' — ' + ENTIDADES_PAGO[n].nombre;
+    return (nombreXLS || '').replace(/\s+/g, ' ').trim();
+  }
+
   // ── Planilla Egreso (cruce UGPP desde archivo XLS) ────────
-  let crucePlanillaData  = [];  // registros ingreso_programa encontrados
-  let cruceXLSTotales    = {};  // { salud, pension, riesgos, caja, total }
+  let crucePlanillaData  = [];
+  let cruceXLSTotales    = {};  // { entidades: [{puc,nit,nombre,valor}], total }
   let cruceXLSNoPlanilla = '';
   let cruceXLSPeriodo    = '';
   let peMontoMovimiento  = 0;
@@ -1182,85 +1209,89 @@
       try {
         const wb = XLSX.read(new Uint8Array(e.target.result), { type: 'array', cellDates: true });
 
-        // ── 1. Hoja Cabeza ─────────────────────────────────
+        // ── 1. Hoja Cabeza → número planilla y período ─────
         const wsCabeza = wb.Sheets['Cabeza'];
         if (!wsCabeza) { mostrarToast('⚠️ No se encontró la hoja "Cabeza"', true); return; }
         const cabeza = XLSX.utils.sheet_to_json(wsCabeza, { header: 1, raw: true });
-        // fila 10 (índice 10): col 0 = periodo pension, col 1 = periodo salud
-        // fila 12 (índice 12): col 1 = número de radicación (número planilla)
-        let noPlanilla = '';
-        let periodo    = '';
+        let noPlanilla = '', periodo = '';
         if (cabeza[12] && cabeza[12][1]) noPlanilla = String(cabeza[12][1]).trim();
-        if (cabeza[10] && cabeza[10][0]) periodo    = String(cabeza[10][0]).trim(); // ej: "2026/02"
-
-        if (!noPlanilla) { mostrarToast('⚠️ No se encontró el número de radicación en la hoja Cabeza', true); return; }
-
+        if (cabeza[10] && cabeza[10][0]) periodo    = String(cabeza[10][0]).trim();
+        if (!noPlanilla) { mostrarToast('⚠️ No se encontró el número de radicación en hoja Cabeza', true); return; }
         cruceXLSNoPlanilla = noPlanilla;
         cruceXLSPeriodo    = periodo;
 
-        // ── 2. Hoja TOTALES A PAGAR ────────────────────────
-        const wsTotales = wb.Sheets['TOTALES A PAGAR'];
-        let salud = 0, pension = 0, riesgos = 0, caja = 0;
-        if (wsTotales) {
-          const totRows = XLSX.utils.sheet_to_json(wsTotales, { header: 1, raw: true });
-          // fila 3 (índice 3): SALUD(0), PENSIÓN(1), RIESGOS(2), CAJAS(3)
-          if (totRows[3]) {
-            salud   = Number(totRows[3][0]) || 0;
-            pension = Number(totRows[3][1]) || 0;
-            riesgos = Number(totRows[3][2]) || 0;
-            caja    = Number(totRows[3][3]) || 0;
+        // ── 2. Hojas de totales → una línea por entidad ────
+        // col 0 = nombre entidad (XLS), col 1 = NIT, col 4 = valor cotización
+        const HOJAS_ENTIDAD = [
+          { hoja: 'Totales Salud',   puc: '28150501' },
+          { hoja: 'Totales Pension', puc: '28150503' },
+          { hoja: 'Totales Riesgos', puc: '28150502' },
+          { hoja: 'Totales Cajas',   puc: '28150504' },
+        ];
+        const entidades = [];
+        let totalPlanilla = 0;
+
+        for (const cfg of HOJAS_ENTIDAD) {
+          const ws = wb.Sheets[cfg.hoja];
+          if (!ws) continue;
+          const rows = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: '' });
+          // datos desde fila índice 3
+          for (let i = 3; i < rows.length; i++) {
+            const r = rows[i];
+            const nombreRaw = r[0] ? String(r[0]).trim() : '';
+            const nit       = r[1] ? String(r[1]).trim().replace(/\D/g, '') : '';
+            const valor     = Number(r[4]) || 0;
+            if (!nombreRaw || valor <= 0) continue;
+            if (nombreRaw.toLowerCase().startsWith('sin ')) continue;
+            entidades.push({
+              puc:    cfg.puc,
+              nit,
+              nombre: nombreEntidad(nit, nombreRaw),
+              valor,
+            });
+            totalPlanilla += valor;
           }
         }
-        const totalPlanilla = salud + pension + riesgos + caja;
-        cruceXLSTotales = { salud, pension, riesgos, caja, total: totalPlanilla };
 
-        // ── 3. Hoja Detalle Planilla → CCs ─────────────────
+        if (entidades.length === 0) { mostrarToast('⚠️ No se encontraron entidades con valor en las hojas de totales', true); return; }
+        cruceXLSTotales = { entidades, total: totalPlanilla };
+
+        // ── 3. Hoja Detalle Planilla → CCs afiliados ───────
         const wsDetalle = wb.Sheets['Detalle Planilla'];
         if (!wsDetalle) { mostrarToast('⚠️ No se encontró la hoja "Detalle Planilla"', true); return; }
         const detRows = XLSX.utils.sheet_to_json(wsDetalle, { header: 1, raw: true, defval: '' });
-        // Encabezado en fila índice 2, datos desde fila 3
-        // col 1 = NÚMERO IDENTIFICACIÓN, col 4 = PRIMER NOMBRE, col 6 = PRIMER APELLIDO
-        const afiliados = []; // { cc, nombre }
+        const afiliados = [];
         for (let i = 3; i < detRows.length; i++) {
           const r = detRows[i];
           const cc = r[1] ? String(r[1]).trim() : '';
-          if (!cc || cc === '') continue;
+          if (!cc) continue;
           const nombre = [r[4], r[5], r[6], r[7]].filter(Boolean).join(' ').trim();
           afiliados.push({ cc, nombre });
         }
-
         if (afiliados.length === 0) { mostrarToast('⚠️ No se encontraron afiliados en el Detalle Planilla', true); return; }
 
         // ── 4. Buscar CIs en ingreso_programa por CC ───────
         const ccs = afiliados.map(a => a.cc);
         const { data: registros, error } = await sb
           .from('ingreso_programa')
-          .select('id, recibo, cc, afiliado, detalle, total, total_ss, eps_val, arl_val, afp_val, ccf_val, fsp, admon, banco')
+          .select('id, recibo, cc, afiliado, total, total_ss, banco, planilla')
           .in('cc', ccs)
           .neq('banco', 'Retiros');
-
         if (error) { mostrarToast('Error buscando en programa: ' + error.message, true); return; }
 
-        // Indexar por CC para cruce rápido
         const porCC = {};
         (registros || []).forEach(r => {
           if (!porCC[r.cc]) porCC[r.cc] = [];
           porCC[r.cc].push(r);
         });
-
         crucePlanillaData = registros || [];
 
         // ── 5. Asignar número de planilla en ingreso_programa ─
-        // Solo a los registros que aún no tienen planilla asignada
         const sinPlanilla = crucePlanillaData.filter(r => !r.planilla || r.planilla === '');
         if (sinPlanilla.length > 0) {
           const ids = sinPlanilla.map(r => r.id);
-          const { error: eUpd } = await sb
-            .from('ingreso_programa')
-            .update({ planilla: noPlanilla })
-            .in('id', ids);
-          if (eUpd) console.warn('Error actualizando planilla en ingreso_programa:', eUpd.message);
-          else sinPlanilla.forEach(r => { r.planilla = noPlanilla; });
+          const { error: eUpd } = await sb.from('ingreso_programa').update({ planilla: noPlanilla }).in('id', ids);
+          if (!eUpd) sinPlanilla.forEach(r => { r.planilla = noPlanilla; });
         }
 
         // ── 6. Actualizar numero_planilla en el movimiento ─
@@ -1271,7 +1302,7 @@
         }
 
         // ── 7. Renderizar resultado ────────────────────────
-        mostrarResultadoCruce(afiliados, porCC, noPlanilla, periodo, totalPlanilla, salud, pension, riesgos, caja);
+        mostrarResultadoCruce(afiliados, porCC, noPlanilla, periodo, entidades, totalPlanilla);
 
       } catch(err) {
         mostrarToast('Error procesando archivo: ' + err.message, true);
@@ -1281,14 +1312,19 @@
     reader.readAsArrayBuffer(archivo);
   }
 
-  function mostrarResultadoCruce(afiliados, porCC, noPlanilla, periodo, totalPlanilla, salud, pension, riesgos, caja) {
-    document.getElementById('peNoPlanilla').textContent = noPlanilla;
-    document.getElementById('pePeriodo').textContent    = periodo;
-    document.getElementById('peCantAfil').textContent   = afiliados.length;
-    document.getElementById('peTotSalud').textContent   = formatCOP(salud);
-    document.getElementById('peTotPension').textContent = formatCOP(pension);
-    document.getElementById('peTotRiesgos').textContent = formatCOP(riesgos);
-    document.getElementById('peTotCaja').textContent    = formatCOP(caja);
+  function mostrarResultadoCruce(afiliados, porCC, noPlanilla, periodo, entidades, totalPlanilla) {
+    document.getElementById('peNoPlanilla').textContent  = noPlanilla;
+    document.getElementById('pePeriodo').textContent     = periodo;
+    document.getElementById('peCantAfil').textContent    = afiliados.length;
+
+    const salud   = entidades.filter(e => e.puc === '28150501').reduce((s,e) => s+e.valor, 0);
+    const pension = entidades.filter(e => e.puc === '28150503').reduce((s,e) => s+e.valor, 0);
+    const riesgos = entidades.filter(e => e.puc === '28150502').reduce((s,e) => s+e.valor, 0);
+    const caja    = entidades.filter(e => e.puc === '28150504').reduce((s,e) => s+e.valor, 0);
+    document.getElementById('peTotSalud').textContent    = formatCOP(salud);
+    document.getElementById('peTotPension').textContent  = formatCOP(pension);
+    document.getElementById('peTotRiesgos').textContent  = formatCOP(riesgos);
+    document.getElementById('peTotCaja').textContent     = formatCOP(caja);
     document.getElementById('peTotPlanilla').textContent = formatCOP(totalPlanilla);
     document.getElementById('peMontoBanco2').textContent = formatCOP(peMontoMovimiento);
 
@@ -1297,18 +1333,18 @@
     diffEl.textContent = Math.abs(diff) < 1 ? '✅ Cuadra' : (diff >= 0 ? '+' : '') + formatCOP2(diff);
     diffEl.style.color = Math.abs(diff) < 1 ? 'var(--accent)' : 'var(--danger)';
 
-    // Tabla de cruce
-    let encontrados = 0, sinCI = [];
-    let tbodyHTML = '';
+    // Tabla cruce CC → CI
+    let encontrados = 0, sinCI = [], tbodyHTML = '';
     afiliados.forEach(a => {
       const regs = porCC[a.cc] || [];
       if (regs.length > 0) {
         encontrados++;
         regs.forEach((r, ri) => {
-          tbodyHTML += '<tr style="border-bottom:1px solid #f1f3f5;background:' + (ri===0?'':'#fafafa') + ';">'
-            + (ri===0 ? '<td style="padding:6px 10px;font-size:0.78rem;">' + a.cc + '</td>'
-                      + '<td style="padding:6px 10px;font-size:0.78rem;color:var(--muted);">' + a.nombre + '</td>'
-                      : '<td colspan="2" style="padding:6px 10px;font-size:0.73rem;color:var(--muted);">↳ también</td>')
+          tbodyHTML += '<tr style="border-bottom:1px solid #f1f3f5;">'
+            + (ri === 0
+              ? '<td style="padding:6px 10px;font-size:0.78rem;">' + a.cc + '</td>'
+              + '<td style="padding:6px 10px;font-size:0.78rem;color:var(--muted);">' + a.nombre + '</td>'
+              : '<td colspan="2" style="padding:4px 10px;font-size:0.72rem;color:var(--muted);">↳</td>')
             + '<td style="padding:6px 10px;color:var(--accent);font-weight:600;font-size:0.78rem;">CI-' + r.recibo + '</td>'
             + '<td style="padding:6px 10px;font-size:0.78rem;">' + (r.afiliado || '—') + '</td>'
             + '<td style="padding:6px 10px;text-align:right;font-weight:600;">' + formatCOP(r.total_ss || 0) + '</td>'
@@ -1324,70 +1360,46 @@
       }
     });
     document.getElementById('peCruceTabla').innerHTML = tbodyHTML;
-    document.getElementById('peCruceResumen').textContent =
-      encontrados + ' de ' + afiliados.length + ' encontrados';
-    document.getElementById('peCruceResumen').style.color =
-      encontrados === afiliados.length ? 'var(--accent)' : 'var(--danger)';
+    document.getElementById('peCruceResumen').textContent = encontrados + ' de ' + afiliados.length + ' encontrados';
+    document.getElementById('peCruceResumen').style.color = encontrados === afiliados.length ? 'var(--accent)' : 'var(--danger)';
+    document.getElementById('peSinCIMsg').innerHTML = sinCI.length > 0
+      ? '⚠️ Sin CI: ' + sinCI.map(a => '<strong>' + a.cc + '</strong>').join(', ')
+      : '';
 
-    if (sinCI.length > 0) {
-      document.getElementById('peSinCIMsg').innerHTML =
-        '⚠️ ' + sinCI.length + ' afiliado(s) de la planilla no tienen CI en Ingreso Programa: '
-        + sinCI.map(a => '<strong>' + a.cc + '</strong>').join(', ');
-    } else {
-      document.getElementById('peSinCIMsg').innerHTML = '';
-    }
-
-    document.getElementById('peStep1').style.display = 'none';
-    document.getElementById('peStep2').style.display = 'block';
-    document.getElementById('peBtnVolver').style.display = 'inline-block';
-    document.getElementById('peBtnUsar').style.display   = 'inline-block';
-    document.getElementById('peFooterMsg').textContent   =
-      'Se asignó planilla ' + noPlanilla + ' a ' + crucePlanillaData.filter(r => !r._skip).length + ' CIs en Ingreso Programa';
+    document.getElementById('peStep1').style.display      = 'none';
+    document.getElementById('peStep2').style.display      = 'block';
+    document.getElementById('peBtnVolver').style.display  = 'inline-block';
+    document.getElementById('peBtnUsar').style.display    = 'inline-block';
+    document.getElementById('peFooterMsg').textContent    =
+      'Planilla ' + noPlanilla + ' — ' + entidades.length + ' entidades — ' + crucePlanillaData.length + ' CIs asignados';
 
     mostrarToast('✅ Planilla procesada: ' + encontrados + '/' + afiliados.length + ' CIs encontrados');
   }
 
   function usarCruceEnComprobante() {
-    const m = movimientos.find(x => String(x.id) === String(contabMovId));
-    const abs = Math.abs(Number(m ? m.monto : 0));
-    const cuenta  = m ? m.cuenta : '';
+    const m        = movimientos.find(x => String(x.id) === String(contabMovId));
+    const abs      = Math.abs(Number(m ? m.monto : 0));
+    const cuenta   = m ? m.cuenta : '';
     const pucBanco = BANCO_PUC[cuenta] || '11200505';
     const descBanco = PUC[pucBanco] || cuenta;
 
-    // Acumular desglose desde los registros encontrados en ingreso_programa
-    let eps = 0, arl = 0, afp = 0, ccf = 0, fsp = 0;
-    crucePlanillaData.forEach(r => {
-      eps += Number(r.eps_val || 0);
-      arl += Number(r.arl_val || 0);
-      afp += Number(r.afp_val || 0);
-      ccf += Number(r.ccf_val || 0);
-      fsp += Number(r.fsp    || 0);
-    });
-
-    // Si no hay desglose de CIs, usar los totales de la planilla XLS
-    if (eps + arl + afp + ccf + fsp < 1 && cruceXLSTotales.total > 0) {
-      eps = cruceXLSTotales.salud;   // salud ≈ EPS
-      afp = cruceXLSTotales.pension; // pensión ≈ AFP (simplificado)
-      arl = cruceXLSTotales.riesgos;
-      ccf = cruceXLSTotales.caja;
-    }
+    const entidades = cruceXLSTotales.entidades || [];
 
     contabLineasData = [];
+    // Primera línea: crédito banco (sale el dinero)
     contabLineasData.push({ puc: pucBanco, desc: descBanco, deb: 0, cred: abs });
-    if (eps > 0) contabLineasData.push({ puc: '28150501', desc: 'EPS por pagar',  deb: eps, cred: 0 });
-    if (arl > 0) contabLineasData.push({ puc: '28150502', desc: 'ARL por pagar',  deb: arl, cred: 0 });
-    if (afp > 0) contabLineasData.push({ puc: '28150503', desc: 'AFP por pagar',  deb: afp, cred: 0 });
-    if (ccf > 0) contabLineasData.push({ puc: '28150504', desc: 'CCF por pagar',  deb: ccf, cred: 0 });
-    if (fsp > 0) contabLineasData.push({ puc: '28150510', desc: 'FSP por pagar',  deb: fsp, cred: 0 });
+    // Una línea débito por cada entidad
+    entidades.forEach(e => {
+      contabLineasData.push({ puc: e.puc, desc: e.nombre, deb: e.valor, cred: 0 });
+    });
 
-    // Actualizar número planilla en encabezado del comprobante
     if (cruceXLSNoPlanilla) {
       document.getElementById('contabPlanilla').value = cruceXLSNoPlanilla;
     }
 
     renderLineasContab();
     cerrarPlanillaEgreso();
-    mostrarToast('✓ Comprobante cargado — planilla ' + cruceXLSNoPlanilla + ' — ' + crucePlanillaData.length + ' CIs');
+    mostrarToast('✓ Comprobante — planilla ' + cruceXLSNoPlanilla + ' — ' + entidades.length + ' entidades');
   }
 
   // Extrae el número CI del texto del recibo (ej: "01. Mar No._CI-00000021627-..." → "00000021627")
