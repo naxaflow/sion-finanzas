@@ -184,6 +184,18 @@
     <input type="file" id="filePrograma" accept=".xlsx,.xls" onchange="procesarArchivo(this)">
   </div>
 
+  <!-- Sincronización directa con API -->
+  <div style="background:#e6f5ef;border:1px solid #1e8a5e;border-radius:10px;padding:16px 20px;margin-bottom:20px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
+    <div style="font-size:1.5rem;">🔄</div>
+    <div style="flex:1;">
+      <div style="font-weight:700;color:#1e8a5e;margin-bottom:4px;">Sincronización directa con el programa de afiliaciones</div>
+      <div style="font-size:0.85rem;color:#374151;">Trae los registros pagados en el mes seleccionado sin necesidad de exportar Excel</div>
+    </div>
+    <button class="btn" style="background:#1e8a5e;color:white;white-space:nowrap;" onclick="sincronizarAPI()">
+      🔄 Sincronizar desde programa
+    </button>
+  </div>
+
   <!-- Resumen -->
   <div class="resumen" id="resumenDiv" style="display:none;">
     <div class="stat info">
@@ -283,10 +295,101 @@
 
   const MESES = ['','Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 
+  // ── Configuración API afiliaciones ───────────────────────
+  const API_URL = 'https://afiliaciones.multiservice.com.co/api_sion.php';
+  const API_KEY = 'SIONUCE2026';
+
   let registrosDB  = []; // guardados en Supabase
   let nuevos       = []; // del archivo, no existen en BD
   let duplicados   = []; // del archivo, ya existen en BD
   let modoPreview  = false;
+
+  // ── Sincronizar desde API afiliaciones ───────────────────
+  async function sincronizarAPI() {
+    const mes  = document.getElementById('selectMes').value;
+    const anio = document.getElementById('selectAnio').value;
+    if (!mes) { mostrarToast('Seleccioná un mes primero', true); return; }
+
+    // Calcular rango de fechas del mes
+    const ultimoDia = new Date(parseInt(anio), parseInt(mes), 0).getDate();
+    const fecha1 = `${anio}-${mes}-01`;
+    const fecha2 = `${anio}-${mes}-${String(ultimoDia).padStart(2,'0')}`;
+
+    mostrarToast('⏳ Consultando programa de afiliaciones...');
+
+    try {
+      const url = `${API_URL}?key=${API_KEY}&accion=ingreso_programa&fecha1=${fecha1}&fecha2=${fecha2}`;
+      const resp = await fetch(url);
+      const json = await resp.json();
+
+      if (!json.ok) { mostrarToast('Error desde API: ' + (json.error || 'desconocido'), true); return; }
+
+      const recibosDB = new Set(registrosDB.map(r => r.recibo));
+      const delAPI = json.data || [];
+
+      // Mapear campos API → formato Supabase
+      nuevos     = [];
+      duplicados = [];
+      for (const r of delAPI) {
+        const reg = {
+          mes, anio,
+          recibo:    String(r.recibo || '').trim(),
+          cc:        String(r.cc || ''),
+          afiliado:  String(r.afiliado || '').trim(),
+          banco:     String(r.banco || ''),
+          detalle:   String(r.detalle || ''),
+          periodo:   String(r.periodo || ''),
+          total:     Number(r.total) || 0,
+          total_ss:  Number(r.total_ss) || 0,
+          eps_val:   Number(r.v_eps) || 0,
+          arl_val:   Number(r.v_arp) || 0,
+          afp_val:   Number(r.v_afp) || 0,
+          ccf_val:   Number(r.v_ccf) || 0,
+          fsp:       Number(r.fsp) || 0,
+          admon:     Number(r.admon) || 0,
+          intereses: Number(r.intereses) || 0,
+          asesor:    '',
+          planilla:  String(r.planilla || ''),
+          matriz:    String(r.matriz || ''),
+          cotizante: String(r.cotizante || ''),
+          ss_ok:     false,
+        };
+        // No sumar anulados
+        if (r.estado === 'I') {
+          reg.total = 0; reg.total_ss = 0; reg.admon = 0;
+        }
+        if (recibosDB.has(reg.recibo)) duplicados.push(reg);
+        else nuevos.push(reg);
+      }
+
+      modoPreview = true;
+      document.getElementById('sNuevos').textContent     = nuevos.length;
+      document.getElementById('sDuplicados').textContent = duplicados.length;
+      document.getElementById('sTotalBD').textContent    = registrosDB.length;
+      const totalValor = nuevos.reduce((s,r) => s + r.total, 0);
+      document.getElementById('sTotalValor').textContent = formatCOP(totalValor);
+
+      document.getElementById('resumenDiv').style.display  = 'grid';
+      document.getElementById('filtrosDiv').style.display  = 'none';
+      document.getElementById('tablaWrap').style.display   = 'none';
+      document.getElementById('btnBorrarMes').style.display = 'none';
+
+      if (nuevos.length === 0) {
+        mostrarAlerta('warn', `✅ Todos los registros del programa ya están en SION para ${MESES[parseInt(mes)]} ${anio}.`);
+        document.getElementById('accionesDiv').style.display = 'none';
+      } else {
+        ocultarAlerta();
+        document.getElementById('accionesDiv').style.display = 'flex';
+        document.getElementById('btnCount').textContent = nuevos.length;
+        mostrarToast(`✅ ${delAPI.length} registros desde el programa — ${nuevos.length} nuevos para importar`);
+      }
+
+    } catch(e) {
+      mostrarToast('Error conectando con el programa: ' + e.message, true);
+    }
+  }
+
+  // ── Cargar registros desde Supabase ───────────────────────
 
   // ── Al cargar la página, detectar mes actual y cargar ─────
   window.addEventListener('DOMContentLoaded', () => {
