@@ -1223,10 +1223,10 @@
         // ── 2. Hojas de totales → una línea por entidad ────
         // col 0 = nombre entidad (XLS), col 1 = NIT, col 4 = valor cotización
         const HOJAS_ENTIDAD = [
-          { hoja: 'Totales Salud',   puc: '28150501' },
-          { hoja: 'Totales Pension', puc: '28150503' },
-          { hoja: 'Totales Riesgos', puc: '28150502' },
-          { hoja: 'Totales Cajas',   puc: '28150504' },
+          { hoja: 'Totales Salud',   puc: '28150501', colValor: 4 },
+          { hoja: 'Totales Pension', puc: '28150503', colValor: 5 }, // col 5 = VALOR TOTAL COTIZACIONES OBLIGATORIAS
+          { hoja: 'Totales Riesgos', puc: '28150502', colValor: 4 },
+          { hoja: 'Totales Cajas',   puc: '28150504', colValor: 4 },
         ];
         const entidades = [];
         let totalPlanilla = 0;
@@ -1240,7 +1240,7 @@
             const r = rows[i];
             const nombreRaw = r[0] ? String(r[0]).trim() : '';
             const nit       = r[1] ? String(r[1]).trim().replace(/\D/g, '') : '';
-            const valor     = Number(r[4]) || 0;
+            const valor     = Number(r[cfg.colValor]) || 0;
             if (!nombreRaw || valor <= 0) continue;
             if (nombreRaw.toLowerCase().startsWith('sin ')) continue;
             entidades.push({
