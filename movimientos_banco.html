@@ -555,24 +555,35 @@
 
   // ── Cache Ingreso Programa ────────────────────────────────
   async function cargarCachePrograma(recibos) {
-    const faltantes = recibos.filter(r => r && !cachePrograma[r]);
+    // Extraer CIs del texto del recibo para buscar en BD
+    const faltantes = recibos
+      .map(r => extraerCI(r))
+      .filter(r => r && !cachePrograma[r]);
     if (faltantes.length === 0) return;
     const { data } = await sb.from('ingreso_programa')
-      .select('recibo, afiliado, banco, total, total_ss, eps_val, arl_val, afp_val, ccf_val, fsp, admon, detalle, planilla')
+      .select('recibo, afiliado, cc, banco, total, total_ss, eps_val, arl_val, afp_val, ccf_val, fsp, admon, detalle, planilla')
       .in('recibo', faltantes);
-    if (data) data.forEach(r => { cachePrograma[r.recibo] = r; });
+    if (data) data.forEach(r => { 
+      cachePrograma[r.recibo] = r;
+      // También indexar sin ceros para facilitar búsqueda
+      cachePrograma[String(parseInt(r.recibo))] = r;
+    });
   }
 
   // ── Buscar recibo en Ingreso Programa ─────────────────────
   async function buscarRecibo(id, recibo) {
     if (!recibo || recibo.trim() === '') return;
-    if (!cachePrograma[recibo]) {
+    const ci = extraerCI(recibo);
+    if (!buscarEnCache(recibo)) {
       const { data } = await sb.from('ingreso_programa')
-        .select('recibo, afiliado, banco, total, total_ss, eps_val, arl_val, afp_val, ccf_val, fsp, admon, detalle, planilla')
-        .eq('recibo', recibo.trim()).single();
-      if (data) cachePrograma[recibo] = data;
+        .select('recibo, afiliado, cc, banco, total, total_ss, eps_val, arl_val, afp_val, ccf_val, fsp, admon, detalle, planilla')
+        .eq('recibo', ci).single();
+      if (data) {
+        cachePrograma[data.recibo] = data;
+        cachePrograma[ci] = data;
+      }
     }
-    const prog = cachePrograma[recibo];
+    const prog = buscarEnCache(recibo);
     if (!prog) return;
 
     const mov = movimientos.find(m => String(m.id) === String(id));
@@ -849,12 +860,32 @@
   let contabMovId    = null;
   let contabLineasData = [];
 
+  // Extrae el número CI del texto del recibo (ej: "01. Mar No._CI-00000021627-..." → "00000021627")
+  function extraerCI(recibo) {
+    if (!recibo) return null;
+    const m = String(recibo).match(/CI-(\d+)/i);
+    return m ? m[1] : recibo.trim();
+  }
+
+  function buscarEnCache(recibo) {
+    if (!recibo) return null;
+    // Buscar directo
+    if (cachePrograma[recibo]) return cachePrograma[recibo];
+    // Buscar por número CI extraído
+    const ci = extraerCI(recibo);
+    if (ci && cachePrograma[ci]) return cachePrograma[ci];
+    // Buscar con prefijo de ceros
+    const ciPadded = ci ? ci.padStart(11, '0') : null;
+    if (ciPadded && cachePrograma[ciPadded]) return cachePrograma[ciPadded];
+    return null;
+  }
+
   function abrirContabilizar(id) {
     const m = movimientos.find(x => String(x.id) === String(id));
     if (!m) return;
     contabMovId = id;
 
-    const prog = m.recibo ? cachePrograma[m.recibo] : null;
+    const prog = m.recibo ? buscarEnCache(m.recibo) : null;
 
     // Encabezado
     document.getElementById('contabRecibo').textContent  = m.recibo || '—';
@@ -1003,7 +1034,7 @@
 
     const planilla = document.getElementById('contabPlanilla').value.trim();
     const m = movimientos.find(x => String(x.id) === String(contabMovId));
-    const prog = m && m.recibo ? cachePrograma[m.recibo] : null;
+    const prog = m && m.recibo ? buscarEnCache(m.recibo) : null;
 
     // Guardar en tabla comprobantes
     const { error: e1 } = await sb.from('comprobantes').insert([{
@@ -1123,7 +1154,7 @@
     }
 
     tbody.innerHTML = filtrados.map((m, i) => {
-      const prog = m.recibo ? cachePrograma[m.recibo] : null;
+      const prog = m.recibo ? buscarEnCache(m.recibo) : null;
       const tieneMatch = !!prog;
       return `
       <tr>
