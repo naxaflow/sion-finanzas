@@ -324,52 +324,68 @@
 
 <!-- Modal Contabilizar -->
 <div class="modal-overlay" id="modalContab" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:3000;align-items:center;justify-content:center;">
-  <div style="background:white;border-radius:12px;width:95%;max-width:820px;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,0.3);">
+  <div style="background:white;border-radius:12px;width:95%;max-width:860px;max-height:92vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,0.3);">
+    
+    <!-- Header -->
     <div style="padding:16px 24px;background:var(--header-bg);color:white;border-radius:12px 12px 0 0;display:flex;justify-content:space-between;align-items:center;">
-      <h3 style="font-size:1rem;font-weight:700;" id="contabTitulo">Comprobante Contable</h3>
+      <h3 style="font-size:1rem;font-weight:700;">📒 Comprobante de Ingreso</h3>
       <button onclick="cerrarContabilizar()" style="background:none;border:none;color:white;font-size:1.2rem;cursor:pointer;">✕</button>
     </div>
+
     <div style="overflow-y:auto;flex:1;padding:20px 24px;">
-      <!-- Info del movimiento -->
-      <div style="background:#f8fafc;border-radius:8px;padding:12px 16px;margin-bottom:16px;font-size:0.85rem;display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;" id="contabInfo"></div>
-      <!-- Número de planilla -->
-      <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
-        <label style="font-size:0.85rem;font-weight:600;color:var(--muted);white-space:nowrap;">N° Planilla UGPP:</label>
-        <input type="text" id="contabPlanilla" placeholder="Ej: 36709831" 
-          style="border:1px solid var(--border);border-radius:6px;padding:6px 12px;font-size:0.85rem;width:200px;">
-        <span style="font-size:0.78rem;color:var(--muted);">Para cruzar con el pago a entidades</span>
+
+      <!-- Encabezado del comprobante -->
+      <div style="background:#f8fafc;border-radius:8px;padding:14px 18px;margin-bottom:20px;border:1px solid var(--border);">
+        <div style="display:grid;grid-template-columns:160px 1fr;gap:8px 16px;font-size:0.85rem;">
+          <span style="color:var(--muted);font-weight:600;">No. De Recibo</span>
+          <span id="contabRecibo" style="font-weight:700;color:var(--accent);"></span>
+          <span style="color:var(--muted);font-weight:600;">CC</span>
+          <span id="contabCC"></span>
+          <span style="color:var(--muted);font-weight:600;">Afiliado</span>
+          <span id="contabAfiliado"></span>
+          <span style="color:var(--muted);font-weight:600;">No. De Planilla</span>
+          <span>
+            <input type="text" id="contabPlanilla" placeholder="Ej: 36709831"
+              style="border:1px solid var(--border);border-radius:5px;padding:4px 10px;font-size:0.85rem;width:180px;font-weight:600;">
+            <span style="font-size:0.75rem;color:var(--muted);margin-left:8px;">Para cruzar con pago a entidades</span>
+          </span>
+        </div>
       </div>
-      <!-- Tabla de movimientos contables -->
-      <table style="width:100%;border-collapse:collapse;font-size:0.82rem;margin-bottom:12px;">
+
+      <!-- Tabla contable -->
+      <table style="width:100%;border-collapse:collapse;font-size:0.83rem;margin-bottom:10px;">
         <thead>
           <tr style="background:#f8fafc;">
-            <th style="padding:8px 10px;text-align:left;font-size:0.7rem;font-weight:700;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border);">Cuenta PUC</th>
-            <th style="padding:8px 10px;text-align:left;font-size:0.7rem;font-weight:700;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border);">Descripción</th>
-            <th style="padding:8px 10px;text-align:right;font-size:0.7rem;font-weight:700;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border);">Débito</th>
-            <th style="padding:8px 10px;text-align:right;font-size:0.7rem;font-weight:700;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border);">Crédito</th>
-            <th style="padding:8px 10px;border-bottom:1px solid var(--border);width:30px;"></th>
+            <th style="padding:9px 12px;text-align:left;font-size:0.7rem;font-weight:700;text-transform:uppercase;color:var(--muted);border-bottom:2px solid var(--border);width:120px;">Cuenta PUC</th>
+            <th style="padding:9px 12px;text-align:left;font-size:0.7rem;font-weight:700;text-transform:uppercase;color:var(--muted);border-bottom:2px solid var(--border);">Descripción</th>
+            <th style="padding:9px 12px;text-align:right;font-size:0.7rem;font-weight:700;text-transform:uppercase;color:var(--muted);border-bottom:2px solid var(--border);width:120px;">Débito</th>
+            <th style="padding:9px 12px;text-align:right;font-size:0.7rem;font-weight:700;text-transform:uppercase;color:var(--muted);border-bottom:2px solid var(--border);width:120px;">Crédito</th>
+            <th style="padding:9px 12px;border-bottom:2px solid var(--border);width:28px;"></th>
           </tr>
         </thead>
         <tbody id="contabLineas"></tbody>
         <tfoot>
-          <tr style="background:#f0fdf4;font-weight:700;">
-            <td colspan="2" style="padding:8px 10px;">TOTALES</td>
-            <td style="padding:8px 10px;text-align:right;color:var(--accent);" id="contabTotalDeb">$0</td>
-            <td style="padding:8px 10px;text-align:right;color:var(--accent);" id="contabTotalCred">$0</td>
+          <tr style="background:#f0fdf4;font-weight:700;border-top:2px solid var(--border);">
+            <td colspan="2" style="padding:9px 12px;font-size:0.83rem;"></td>
+            <td style="padding:9px 12px;text-align:right;color:var(--accent);" id="contabTotalDeb"></td>
+            <td style="padding:9px 12px;text-align:right;color:var(--accent);" id="contabTotalCred"></td>
             <td></td>
           </tr>
           <tr>
-            <td colspan="5" style="padding:6px 10px;text-align:right;">
-              <span id="contabDiff" style="font-size:0.82rem;font-weight:700;"></span>
+            <td colspan="5" style="padding:6px 12px;text-align:right;">
+              <span id="contabDiff" style="font-size:0.83rem;font-weight:700;"></span>
             </td>
           </tr>
         </tfoot>
       </table>
-      <!-- Botón agregar línea -->
-      <button onclick="agregarLineaContab()" style="background:none;border:1px dashed var(--border);border-radius:6px;padding:6px 14px;font-size:0.82rem;color:var(--muted);cursor:pointer;width:100%;margin-bottom:16px;">
+
+      <button onclick="agregarLineaContab()" style="background:none;border:1px dashed var(--border);border-radius:6px;padding:6px 14px;font-size:0.82rem;color:var(--muted);cursor:pointer;width:100%;">
         + Agregar línea
       </button>
+
     </div>
+
+    <!-- Footer -->
     <div style="padding:14px 24px;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;">
       <span style="font-size:0.8rem;color:var(--muted);" id="contabEstado"></span>
       <div style="display:flex;gap:10px;">
@@ -838,85 +854,78 @@
     if (!m) return;
     contabMovId = id;
 
-    // Título
-    document.getElementById('contabTitulo').textContent =
-      `Comprobante — ${m.fecha} | ${m.descripcion || ''} | ${formatCOP(Math.abs(m.monto))}`;
+    const prog = m.recibo ? cachePrograma[m.recibo] : null;
 
-    // Info del movimiento
-    document.getElementById('contabInfo').innerHTML =
-      `<div><span style="color:var(--muted);font-size:0.75rem;">FECHA</span><br><strong>${m.fecha}</strong></div>
-       <div><span style="color:var(--muted);font-size:0.75rem;">CONCEPTO</span><br><strong>${m.concepto || '—'}</strong></div>
-       <div><span style="color:var(--muted);font-size:0.75rem;">MONTO</span><br><strong style="color:${m.monto>=0?'var(--credit)':'var(--debit)'}">${formatCOP(m.monto)}</strong></div>`;
+    // Encabezado
+    document.getElementById('contabRecibo').textContent  = m.recibo || '—';
+    document.getElementById('contabCC').textContent      = prog ? prog.cc || '—' : '—';
+    document.getElementById('contabAfiliado').textContent = prog ? prog.afiliado || '—' : (m.descripcion || '—');
+    document.getElementById('contabPlanilla').value      = m.numero_planilla || '';
+    document.getElementById('contabEstado').textContent  = m.contabilizado ? '✅ Ya contabilizado' : '';
 
-    // Planilla
-    document.getElementById('contabPlanilla').value = m.numero_planilla || '';
-
-    // Generar líneas automáticas según concepto
-    contabLineasData = generarLineasAuto(m);
+    // Generar líneas
+    contabLineasData = generarLineasAuto(m, prog);
     renderLineasContab();
 
-    // Mostrar modal
-    const modal = document.getElementById('modalContab');
-    modal.style.display = 'flex';
+    document.getElementById('modalContab').style.display = 'flex';
   }
 
-  function generarLineasAuto(m) {
-    const lineas = [];
-    const monto  = Number(m.monto);
-    const abs    = Math.abs(monto);
-    const cuenta = m.cuenta || '';
-
-    // Cuenta del banco según la cuenta seleccionada
+  function generarLineasAuto(m, prog) {
+    const lineas  = [];
+    const monto   = Number(m.monto);
+    const abs     = Math.abs(monto);
+    const cuenta  = m.cuenta || '';
     const pucBanco = BANCO_PUC[cuenta] || '11200505';
     const descBanco = PUC[pucBanco] || cuenta;
 
-    // Buscar datos de ingreso programa si tiene CI-
-    const prog = m.recibo ? cachePrograma[m.recibo] : null;
+    const detalle = prog ? String(prog.detalle || '').toUpperCase() : '';
+    const esAdmision  = detalle.includes('ADMISI');
+    const esReintegro = detalle.includes('REINTEGRO') || detalle.includes('REINGRESO');
 
     if (m.concepto === 'Seguridad Social' && monto > 0) {
-      // INGRESO — débito banco, créditos SS + admon
-      lineas.push({ puc: pucBanco, desc: descBanco,     deb: abs,  cred: 0,   editable: false });
 
-      if (prog) {
-        const detalle = String(prog.detalle || '').toUpperCase();
-        if (detalle.includes('ADMISI')) {
-          // Admisión: comisión = total - 67650, sostenibilidad = 67650
-          lineas.push({ puc: '28150505', desc: 'Comisiones por pagar', deb: 0, cred: abs - 67650, editable: false });
-          lineas.push({ puc: '41701001', desc: 'Sostenibilidad',        deb: 0, cred: 67650,       editable: false });
-        } else if (detalle.includes('REINGRESO') || detalle.includes('REINTEGRO')) {
-          // Reintegro: comisión = 67650, sostenibilidad = total - 67650
-          lineas.push({ puc: '28150505', desc: 'Comisiones por pagar', deb: 0, cred: 67650,       editable: false });
-          lineas.push({ puc: '41701001', desc: 'Sostenibilidad',        deb: 0, cred: abs - 67650, editable: false });
-        } else {
-          // Permanencia
-          if (Number(prog.eps_val)  > 0) lineas.push({ puc: '28150501', desc: 'EPS por pagar',  deb: 0, cred: Number(prog.eps_val),  editable: false });
-          if (Number(prog.arl_val)  > 0) lineas.push({ puc: '28150502', desc: 'ARL por pagar',  deb: 0, cred: Number(prog.arl_val),  editable: false });
-          if (Number(prog.afp_val)  > 0) lineas.push({ puc: '28150503', desc: 'AFP por pagar',  deb: 0, cred: Number(prog.afp_val),  editable: false });
-          if (Number(prog.ccf_val)  > 0) lineas.push({ puc: '28150504', desc: 'CCF por pagar',  deb: 0, cred: Number(prog.ccf_val),  editable: false });
-          if (Number(prog.fsp)      > 0) lineas.push({ puc: '28150510', desc: 'FSP por pagar',  deb: 0, cred: Number(prog.fsp),      editable: false });
-          if (Number(prog.admon)    > 0) lineas.push({ puc: '41701001', desc: 'Sostenibilidad', deb: 0, cred: Number(prog.admon),    editable: false });
-        }
+      // Débito: banco
+      lineas.push({ puc: pucBanco, desc: descBanco, deb: abs, cred: 0 });
+
+      if (esAdmision) {
+        // ADMISIÓN
+        lineas.push({ puc: '28150505', desc: 'ADMISIÓN',       deb: 0, cred: abs - 67650 });
+        lineas.push({ puc: '41701001', desc: 'SOSTENIBILIDAD', deb: 0, cred: 67650 });
+
+      } else if (esReintegro) {
+        // REINTEGRO
+        lineas.push({ puc: '28150505', desc: 'REINTEGRO',      deb: 0, cred: 67650 });
+        lineas.push({ puc: '41701001', desc: 'SOSTENIBILIDAD', deb: 0, cred: abs - 67650 });
+
+      } else if (prog) {
+        // PERMANENCIA — cuentas detalladas desde ingreso programa
+        if (Number(prog.eps_val) > 0) lineas.push({ puc: '28150501', desc: prog.eps_nombre || 'EPS por pagar',  deb: 0, cred: Number(prog.eps_val) });
+        if (Number(prog.arl_val) > 0) lineas.push({ puc: '28150502', desc: prog.arl_nombre || 'ARL por pagar',  deb: 0, cred: Number(prog.arl_val) });
+        if (Number(prog.afp_val) > 0) lineas.push({ puc: '28150503', desc: prog.afp_nombre || 'AFP por pagar',  deb: 0, cred: Number(prog.afp_val) });
+        if (Number(prog.ccf_val) > 0) lineas.push({ puc: '28150504', desc: prog.ccf_nombre || 'CCF por pagar',  deb: 0, cred: Number(prog.ccf_val) });
+        if (Number(prog.fsp)     > 0) lineas.push({ puc: '28150510', desc: 'FSP por pagar',                     deb: 0, cred: Number(prog.fsp) });
+        if (Number(prog.admon)   > 0) lineas.push({ puc: '41701001', desc: 'SOSTENIBILIDAD',                    deb: 0, cred: Number(prog.admon) });
       } else {
-        // Sin CI conocido — dejar crédito manual
-        lineas.push({ puc: '', desc: 'SS por pagar', deb: 0, cred: abs, editable: true });
+        // Sin datos de programa — línea manual
+        lineas.push({ puc: '', desc: 'SS por pagar', deb: 0, cred: abs });
       }
 
     } else if (m.concepto === 'Planillas Pagadas' && monto < 0) {
-      // EGRESO planilla — crédito banco, débitos por entidad
-      lineas.push({ puc: pucBanco, desc: descBanco, deb: 0, cred: abs, editable: false });
-      lineas.push({ puc: '28150501', desc: 'EPS por pagar',  deb: 0, cred: 0, editable: true });
-      lineas.push({ puc: '28150502', desc: 'ARL por pagar',  deb: 0, cred: 0, editable: true });
-      lineas.push({ puc: '28150503', desc: 'AFP por pagar',  deb: 0, cred: 0, editable: true });
-      lineas.push({ puc: '28150504', desc: 'CCF por pagar',  deb: 0, cred: 0, editable: true });
+      // EGRESO planilla
+      lineas.push({ puc: pucBanco, desc: descBanco,   deb: 0,   cred: abs });
+      lineas.push({ puc: '28150501', desc: 'EPS',     deb: 0,   cred: 0 });
+      lineas.push({ puc: '28150502', desc: 'ARL',     deb: 0,   cred: 0 });
+      lineas.push({ puc: '28150503', desc: 'AFP',     deb: 0,   cred: 0 });
+      lineas.push({ puc: '28150504', desc: 'CCF',     deb: 0,   cred: 0 });
 
     } else {
-      // Otros — una línea débito y una crédito manuales
+      // Otros
       if (monto >= 0) {
-        lineas.push({ puc: pucBanco, desc: descBanco, deb: abs, cred: 0, editable: false });
-        lineas.push({ puc: '', desc: '',              deb: 0,   cred: abs, editable: true });
+        lineas.push({ puc: pucBanco, desc: descBanco, deb: abs, cred: 0 });
+        lineas.push({ puc: '',       desc: '',         deb: 0,   cred: abs });
       } else {
-        lineas.push({ puc: '', desc: '',              deb: abs, cred: 0,   editable: true });
-        lineas.push({ puc: pucBanco, desc: descBanco, deb: 0,   cred: abs, editable: false });
+        lineas.push({ puc: '',       desc: '',         deb: abs, cred: 0 });
+        lineas.push({ puc: pucBanco, desc: descBanco,  deb: 0,   cred: abs });
       }
     }
     return lineas;
@@ -991,19 +1000,36 @@
     if (Math.abs(totDeb - totCred) >= 1) {
       mostrarToast('⚠️ El comprobante no cuadra — revisa los valores', true); return;
     }
-    const planilla = document.getElementById('contabPlanilla').value.trim();
 
-    // Guardar número de planilla en el movimiento si se ingresó
-    if (planilla) {
-      await guardarCampo(contabMovId, 'numero_planilla', planilla);
-    }
+    const planilla = document.getElementById('contabPlanilla').value.trim();
+    const m = movimientos.find(x => String(x.id) === String(contabMovId));
+    const prog = m && m.recibo ? cachePrograma[m.recibo] : null;
+
+    // Guardar en tabla comprobantes
+    const { error: e1 } = await sb.from('comprobantes').insert([{
+      mov_id:          contabMovId,
+      fecha:           m ? m.fecha_orden : null,
+      cuenta:          m ? m.cuenta : null,
+      descripcion:     m ? m.descripcion : null,
+      recibo:          m ? m.recibo : null,
+      cc:              prog ? prog.cc : null,
+      afiliado:        prog ? prog.afiliado : null,
+      numero_planilla: planilla || (m ? m.numero_planilla : null),
+      tipo:            m && Number(m.monto) >= 0 ? 'ingreso' : 'egreso',
+      estado:          'borrador',
+      lineas:          JSON.stringify(contabLineasData)
+    }]);
+    if (e1) { mostrarToast('Error guardando comprobante: ' + e1.message, true); return; }
+
+    // Guardar número de planilla en el movimiento
+    if (planilla) await guardarCampo(contabMovId, 'numero_planilla', planilla);
 
     // Marcar como contabilizado
     await sb.from('movimientos').update({ contabilizado: true }).eq('id', contabMovId);
-    const idx = movimientos.findIndex(m => String(m.id) === String(contabMovId));
+    const idx = movimientos.findIndex(x => String(x.id) === String(contabMovId));
     if (idx !== -1) movimientos[idx].contabilizado = true;
 
-    mostrarToast('✅ Comprobante guardado');
+    mostrarToast('✅ Comprobante guardado correctamente');
     cerrarContabilizar();
     renderTabla();
   }
