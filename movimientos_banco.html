@@ -1164,7 +1164,7 @@
             title="Usa dd/mm/aaaa. También acepta: 17-03-26, 17/3/2026, 17-mar-26"
             onblur="guardarCampo('${m.id}','fecha',this.value)"
             onkeydown="if(event.key==='Enter')this.blur()"></td>
-        <td style="color:var(--muted);font-size:0.78rem;">${esc(m.canal)}</td>
+        <td style="color:var(--muted);font-size:0.78rem;">${extraerCI(m.recibo) && m.recibo && m.recibo.toUpperCase().includes('CI-') ? '<span style="color:var(--accent);font-weight:600;font-size:0.75rem;">CI-'+extraerCI(m.recibo)+'</span>' : esc(m.canal)}</td>
         <td>
           <input class="input-tabla" value="${esc(m.descripcion)}" style="min-width:140px;"
             onblur="guardarCampo('${m.id}','descripcion',this.value)">
