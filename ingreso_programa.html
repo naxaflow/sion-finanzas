@@ -295,6 +295,26 @@
 
   const MESES = ['','Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 
+  // ── Catálogo NIT entidades de SS (mismo que movimientos_banco.html) ──
+  const ENTIDADES_NIT = {
+    'NUEVA': '900156264',    'SANITAS': '800251440',   'CAPITAL SALUD': '900298372',
+    'FAMISANAR': '830003564','COMPENSAR': '860066942', 'ADRES': '901037916',
+    'ASMET': '900935126',    'SALUD TOTAL': '800130907',
+    'COLPATRIA': '860002183','POSITIVA': '860011153',  'SURA': '800088702',
+    'PORVENIR': '800224808', 'PROTECCION': '800229739',
+    'COLPENSIONES': '900336004', 'COLOMBIANA DE PENSIONES': '900336004',
+    'COLFONDOS': '800227940',
+    'COMFAMILIAR': '891180008', 'HUILA': '891180008',
+  };
+  function buscarNIT(nombre) {
+    if (!nombre) return '';
+    const n = String(nombre).toUpperCase();
+    for (const [clave, nit] of Object.entries(ENTIDADES_NIT)) {
+      if (n.includes(clave)) return nit;
+    }
+    return '';
+  }
+
   // ── Configuración API afiliaciones ───────────────────────
   const API_URL = 'https://afiliaciones.multiservice.com.co/api_sion.php';
   const API_KEY = 'SIONUCE2026';
@@ -331,6 +351,11 @@
       nuevos     = [];
       duplicados = [];
       for (const r of delAPI) {
+        // Nombres de entidades desde la API (campos n_eps, n_arp, n_afp, n_ccf si existen)
+        const epsNom = String(r.n_eps || r.eps_nombre || '').trim();
+        const arlNom = String(r.n_arp || r.arl_nombre || '').trim();
+        const afpNom = String(r.n_afp || r.afp_nombre || '').trim();
+        const ccfNom = String(r.n_ccf || r.ccf_nombre || '').trim();
         const reg = {
           mes, anio,
           recibo:    String(r.recibo || '').trim(),
@@ -345,6 +370,10 @@
           arl_val:   Number(r.v_arp) || 0,
           afp_val:   Number(r.v_afp) || 0,
           ccf_val:   Number(r.v_ccf) || 0,
+          eps_nombre: epsNom, arl_nombre: arlNom,
+          afp_nombre: afpNom, ccf_nombre: ccfNom,
+          eps_nit: buscarNIT(epsNom), arl_nit: buscarNIT(arlNom),
+          afp_nit: buscarNIT(afpNom), ccf_nit: buscarNIT(ccfNom),
           fsp:       Number(r.fsp) || 0,
           admon:     Number(r.admon) || 0,
           intereses: Number(r.intereses) || 0,
@@ -474,15 +503,22 @@
 
         const headers = rows[headerRow];
         const idx = {
-          recibo: headers.indexOf('Recibo'), cc: headers.indexOf('C.C.'),
-          afiliado: headers.indexOf('Afiliado'), banco: headers.indexOf('Banco'),
-          detalle: headers.indexOf('Detalle'), periodo: headers.indexOf('Periodo'),
-          total: headers.indexOf('Total'), totalSS: headers.indexOf('Total SS'),
-          epsVal: 18, arlVal: 20, afpVal: 22, ccfVal: 24,
-          fsp: headers.indexOf('FSP'), admon: headers.indexOf('Admon'),
-          intereses: headers.indexOf('Intereses'), asesor: headers.indexOf('Asesor'),
+          recibo:   headers.indexOf('Recibo'),   cc:       headers.indexOf('C.C.'),
+          afiliado: headers.indexOf('Afiliado'), banco:    headers.indexOf('Banco'),
+          detalle:  headers.indexOf('Detalle'),  periodo:  headers.indexOf('Periodo'),
+          total:    headers.indexOf('Total'),    totalSS:  headers.indexOf('Total SS'),
+          // Nombres e índices fijos según estructura Menú.xlsx (base-0):
+          // Col 18=EPS nombre, 19=EPS/Valor, 20=ARL nombre, 21=ARL/Valor
+          // Col 22=AFP nombre, 23=AFP/Valor, 24=CCF nombre, 25=CCF/Valor
+          epsNom: 18, epsVal: 19,
+          arlNom: 20, arlVal: 21,
+          afpNom: 22, afpVal: 23,
+          ccfNom: 24, ccfVal: 25,
+          fsp:      headers.indexOf('FSP/Valor') !== -1 ? headers.indexOf('FSP/Valor') : 26,
+          admon:    headers.indexOf('Admon'),
+          intereses:headers.indexOf('Intereses'), asesor:  headers.indexOf('Asesor'),
           planilla: headers.indexOf('No.Planilla'),
-          matriz: headers.indexOf('Matriz'), cotizante: headers.indexOf('Cotizante'),
+          matriz:   headers.indexOf('Matriz'),    cotizante: headers.indexOf('Cotizante'),
         };
 
         const mes  = document.getElementById('selectMes').value;
@@ -493,6 +529,10 @@
         for (let i = headerRow + 1; i < rows.length; i++) {
           const r = rows[i];
           if (!r || !r[idx.recibo]) continue;
+          const epsNom = String(r[idx.epsNom]||'').trim();
+          const arlNom = String(r[idx.arlNom]||'').trim();
+          const afpNom = String(r[idx.afpNom]||'').trim();
+          const ccfNom = String(r[idx.ccfNom]||'').trim();
           const epsV = Number(r[idx.epsVal])||0, arlV = Number(r[idx.arlVal])||0;
           const afpV = Number(r[idx.afpVal])||0, ccfV = Number(r[idx.ccfVal])||0;
           const totalSS = Number(r[idx.totalSS])||0;
@@ -507,6 +547,9 @@
             total:     Number(r[idx.total])||0,
             total_ss:  totalSS,
             eps_val: epsV, arl_val: arlV, afp_val: afpV, ccf_val: ccfV,
+            eps_nombre: epsNom, arl_nombre: arlNom, afp_nombre: afpNom, ccf_nombre: ccfNom,
+            eps_nit: buscarNIT(epsNom), arl_nit: buscarNIT(arlNom),
+            afp_nit: buscarNIT(afpNom), ccf_nit: buscarNIT(ccfNom),
             fsp:       Number(r[idx.fsp])||0,
             admon:     Number(r[idx.admon])||0,
             intereses: Number(r[idx.intereses])||0,
