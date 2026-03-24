@@ -1920,20 +1920,25 @@
           if (Number(l.deb) <= 0) return;
           const nit  = l.nit || (String(l.desc||'').match(/^(\d{7,12})\s*[—\-]/) || [])[1] || '';
           const desc = l.desc || '';
-          const key  = nit || desc;
+          const key  = (l.puc||'') + '|' + (nit || desc);
           if (!key) return;
-          if (!acumVerif[key]) acumVerif[key] = { codigo: l.puc||'', nit, nombre: desc, afiliados: 0, valor: 0 };
+          if (!acumVerif[key]) acumVerif[key] = { puc: l.puc||'', nit, nombre: desc, afiliados: 0, valor: 0 };
           acumVerif[key].valor += Number(l.deb);
           acumVerif[key].afiliados += 1;
         });
-        const verifReconstruido = Object.values(acumVerif).sort((a,b) => a.nombre.localeCompare(b.nombre));
+        // Ordenar por PUC: 28150501=EPS, 28150503=AFP, 28150502=ARL, 28150504=CCF
+        const ORDEN_PUC = {'28150501':1,'28150503':2,'28150502':3,'28150504':4};
+        const verifReconstruido = Object.values(acumVerif).sort((a,b) => {
+          const pa = ORDEN_PUC[a.puc]||9, pb = ORDEN_PUC[b.puc]||9;
+          return pa !== pb ? pa - pb : a.nombre.localeCompare(b.nombre);
+        });
         if (verifReconstruido.length > 0) {
           let vHtml = '';
           let totAfil = 0, totValor = 0;
           verifReconstruido.forEach((e, idx) => {
             const bg = idx % 2 === 0 ? '' : 'background:#f8fafc;';
             vHtml += '<tr style="border-bottom:1px solid #f1f3f5;' + bg + '">'
-              + '<td style="padding:6px 10px;font-weight:600;font-size:0.78rem;">' + esc(e.codigo) + '</td>'
+              + '<td style="padding:6px 10px;font-weight:600;font-size:0.78rem;">' + esc(e.puc) + '</td>'
               + '<td style="padding:6px 10px;font-size:0.75rem;color:var(--muted);">' + esc(e.nit) + '</td>'
               + '<td style="padding:6px 10px;">' + esc(e.nombre) + '</td>'
               + '<td style="padding:6px 10px;text-align:right;">' + e.afiliados + '</td>'
@@ -1952,7 +1957,7 @@
               + '<div style="border:1px solid var(--border);border-radius:8px;overflow:hidden;">'
               + '<table style="width:100%;border-collapse:collapse;font-size:0.78rem;">'
               + '<thead><tr style="background:#f8fafc;">'
-              + '<th style="padding:6px 10px;text-align:left;font-size:0.67rem;font-weight:700;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border);">Código</th>'
+              + '<th style="padding:6px 10px;text-align:left;font-size:0.67rem;font-weight:700;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border);">PUC</th>'
               + '<th style="padding:6px 10px;text-align:left;font-size:0.67rem;font-weight:700;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border);">NIT</th>'
               + '<th style="padding:6px 10px;text-align:left;font-size:0.67rem;font-weight:700;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border);">Entidad</th>'
               + '<th style="padding:6px 10px;text-align:right;font-size:0.67rem;font-weight:700;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border);">Afiliados</th>'
@@ -1968,8 +1973,8 @@
             );
             panelVerif = document.getElementById('panelVerifEnModal');
           }
-          document.getElementById('panelVerifBody').innerHTML     = vHtml;
-          document.getElementById('panelVerifTotAfil').textContent = totAfil;
+          document.getElementById('panelVerifBody').innerHTML      = vHtml;
+          document.getElementById('panelVerifTotAfil').textContent  = totAfil;
           document.getElementById('panelVerifTotValor').textContent = formatCOP(totValor);
         }
       }
