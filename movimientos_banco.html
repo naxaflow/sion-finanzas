@@ -1820,26 +1820,30 @@
 
     const planilla = document.getElementById('contabPlanilla').value.trim();
     const m = movimientos.find(x => String(x.id) === String(contabMovId));
-    const prog = m && m.recibo ? buscarEnCache(m.recibo) : null;
+    if (!m) { mostrarToast('⚠️ No se encontró el movimiento', true); return; }
 
-    // Guardar en tabla comprobantes
+    console.log('Guardando comprobante mov_id:', contabMovId, 'planilla:', planilla);
+
     const { error: e1 } = await sb.from('comprobantes').insert([{
       mov_id:          contabMovId,
-      fecha:           m ? m.fecha_orden : null,
-      cuenta:          m ? m.cuenta : null,
-      descripcion:     m ? m.descripcion : null,
-      recibo:          m ? m.recibo : null,
-      numero_planilla: planilla || (m ? m.numero_planilla : null),
-      tipo:            m && Number(m.monto) >= 0 ? 'ingreso' : 'egreso',
+      fecha:           m.fecha_orden || null,
+      cuenta:          m.cuenta      || null,
+      descripcion:     m.descripcion || null,
+      recibo:          m.recibo      || null,
+      numero_planilla: planilla || m.numero_planilla || null,
+      tipo:            Number(m.monto) >= 0 ? 'ingreso' : 'egreso',
       estado:          'borrador',
       lineas:          JSON.stringify(contabLineasData)
-    }]);
-    if (e1) { mostrarToast('Error guardando comprobante: ' + e1.message, true); return; }
+    }], { returning: 'minimal' });
 
-    // Guardar número de planilla en el movimiento
+    if (e1) {
+      console.error('Error Supabase comprobantes:', e1);
+      mostrarToast('Error guardando comprobante: ' + (e1.message || e1.code || JSON.stringify(e1)), true);
+      return;
+    }
+
     if (planilla) await guardarCampo(contabMovId, 'numero_planilla', planilla);
 
-    // Marcar como contabilizado
     await sb.from('movimientos').update({ contabilizado: true }).eq('id', contabMovId);
     const idx = movimientos.findIndex(x => String(x.id) === String(contabMovId));
     if (idx !== -1) movimientos[idx].contabilizado = true;
