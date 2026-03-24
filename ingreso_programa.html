@@ -351,11 +351,10 @@
       nuevos     = [];
       duplicados = [];
       for (const r of delAPI) {
-        // Nombres de entidades desde la API (campos n_eps, n_arp, n_afp, n_ccf si existen)
-        const epsNom = String(r.n_eps || r.eps_nombre || '').trim();
-        const arlNom = String(r.n_arp || r.arl_nombre || '').trim();
-        const afpNom = String(r.n_afp || r.afp_nombre || '').trim();
-        const ccfNom = String(r.n_ccf || r.ccf_nombre || '').trim();
+        const epsNom = String(r.n_eps || '').trim();
+        const arlNom = String(r.n_arp || '').trim();
+        const afpNom = String(r.n_afp || '').trim();
+        const ccfNom = String(r.n_ccf || '').trim();
         const reg = {
           mes, anio,
           recibo:    String(r.recibo || '').trim(),
@@ -372,8 +371,10 @@
           ccf_val:   Number(r.v_ccf) || 0,
           eps_nombre: epsNom, arl_nombre: arlNom,
           afp_nombre: afpNom, ccf_nombre: ccfNom,
-          eps_nit: buscarNIT(epsNom), arl_nit: buscarNIT(arlNom),
-          afp_nit: buscarNIT(afpNom), ccf_nit: buscarNIT(ccfNom),
+          eps_nit: String(r.nit_eps || buscarNIT(epsNom) || ''),
+          arl_nit: String(r.nit_arp || buscarNIT(arlNom) || ''),
+          afp_nit: String(r.nit_afp || buscarNIT(afpNom) || ''),
+          ccf_nit: String(r.nit_ccf || buscarNIT(ccfNom) || ''),
           fsp:       Number(r.fsp) || 0,
           admon:     Number(r.admon) || 0,
           intereses: Number(r.intereses) || 0,
@@ -383,7 +384,6 @@
           cotizante: String(r.cotizante || ''),
           ss_ok:     false,
         };
-        // No sumar anulados
         if (r.estado === 'I') {
           reg.total = 0; reg.total_ss = 0; reg.admon = 0;
         }
@@ -403,14 +403,14 @@
       document.getElementById('tablaWrap').style.display   = 'none';
       document.getElementById('btnBorrarMes').style.display = 'none';
 
-      if (nuevos.length === 0) {
-        mostrarAlerta('warn', `✅ Todos los registros del programa ya están en SION para ${MESES[parseInt(mes)]} ${anio}.`);
+      if (nuevos.length === 0 && duplicados.length === 0) {
+        mostrarAlerta('warn', `✅ No hay registros para procesar en ${MESES[parseInt(mes)]} ${anio}.`);
         document.getElementById('accionesDiv').style.display = 'none';
       } else {
         ocultarAlerta();
         document.getElementById('accionesDiv').style.display = 'flex';
-        document.getElementById('btnCount').textContent = nuevos.length;
-        mostrarToast(`✅ ${delAPI.length} registros desde el programa — ${nuevos.length} nuevos para importar`);
+        document.getElementById('btnCount').textContent = nuevos.length + duplicados.length;
+        mostrarToast(`✅ ${delAPI.length} registros — ${nuevos.length} nuevos, ${duplicados.length} para actualizar`);
       }
 
     } catch(e) {
