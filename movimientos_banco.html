@@ -2087,54 +2087,52 @@
       pucList.innerHTML = Object.entries(PUC).map(([k,v]) =>
         `<option value="${k}">${k} — ${v}</option>`).join('');
     }
-    const lineas = contabLineasData.filter(l => !l._resumen);
-    tbody.innerHTML = lineas.map((l, i) => {
-      const bg = i % 2 === 0 ? '#ffffff' : '#f0f4f8';
-      // Nombre de cuenta desde PUC
+    let rowNum = 0;
+    tbody.innerHTML = contabLineasData.map((l, realIdx) => {
+      if (l._resumen) return '';
+      rowNum++;
+      const bg = rowNum % 2 === 0 ? '#f0f4f8' : '#ffffff';
       const pucKey = (l.puc || '').split(' ')[0];
       const cuentaNombre = PUC[pucKey] || l.puc || '';
-      // Tercero: nombre desde ENTIDADES_PAGO o desc limpia
       const nitLimpio = (l.nit || '').replace(/\D/g,'');
       const terceroNombre = nitLimpio && ENTIDADES_PAGO[nitLimpio]
         ? ENTIDADES_PAGO[nitLimpio].nombre
         : (l.desc || '').replace(/^\d{7,12}\s*[—\-]\s*/,'').trim();
-      const deb  = Number(l.deb)  > 0 ? formatCOP(l.deb)  : '';
-      const cred = Number(l.cred) > 0 ? formatCOP(l.cred) : '';
       return `<tr style="border-bottom:1px solid #dce3ea;background:${bg};">
-        <td style="padding:6px 10px;text-align:center;color:#6b7280;font-size:0.78rem;">${i+1}</td>
+        <td style="padding:6px 10px;text-align:center;color:#6b7280;font-size:0.78rem;">${rowNum}</td>
         <td style="padding:6px 8px;">
           <input value="${esc(pucKey)}" placeholder="PUC" list="pucList"
             style="border:1px solid var(--border);border-radius:4px;padding:3px 6px;font-size:0.78rem;width:120px;background:transparent;"
-            onchange="updateLineaContab(${i},'puc',this.value.split(' ')[0]);renderLineasContab()">
+            onchange="updateLineaContab(${realIdx},'puc',this.value.split(' ')[0]);renderLineasContab()">
           <div style="font-size:0.68rem;color:#6b7280;margin-top:1px;">${esc(cuentaNombre.substring(0,20))}</div>
         </td>
         <td style="padding:6px 8px;">
           <input value="${esc(l.desc||'')}" placeholder="Observaciones"
             style="border:1px solid var(--border);border-radius:4px;padding:3px 6px;font-size:0.78rem;width:100%;background:transparent;"
-            onchange="updateLineaContab(${i},'desc',this.value)">
+            onchange="updateLineaContab(${realIdx},'desc',this.value)">
         </td>
         <td style="padding:6px 8px;text-align:right;">
           <input value="${Number(l.deb)>0?l.deb:''}" placeholder="0" type="number" min="0"
             style="border:1px solid var(--border);border-radius:4px;padding:3px 6px;font-size:0.78rem;width:95px;text-align:right;background:transparent;${Number(l.deb)>0?'color:#1e40af;font-weight:600;':''}"
-            onchange="updateLineaContab(${i},'deb',this.value)">
+            onchange="updateLineaContab(${realIdx},'deb',this.value)">
         </td>
         <td style="padding:6px 8px;text-align:right;">
           <input value="${Number(l.cred)>0?l.cred:''}" placeholder="0" type="number" min="0"
             style="border:1px solid var(--border);border-radius:4px;padding:3px 6px;font-size:0.78rem;width:95px;text-align:right;background:transparent;${Number(l.cred)>0?'color:#166534;font-weight:600;':''}"
-            onchange="updateLineaContab(${i},'cred',this.value)">
+            onchange="updateLineaContab(${realIdx},'cred',this.value)">
         </td>
         <td style="padding:6px 8px;">
           <input value="${esc(terceroNombre.substring(0,25))}" placeholder="Tercero"
             style="border:1px solid var(--border);border-radius:4px;padding:3px 6px;font-size:0.75rem;width:100%;background:transparent;"
-            onchange="updateLineaContab(${i},'_tercero',this.value)">
+            onchange="updateLineaContab(${realIdx},'_tercero',this.value)">
         </td>
         <td style="padding:6px 8px;">
           <input value="${esc(l.nit||'')}" placeholder="NIT"
             style="border:1px solid var(--border);border-radius:4px;padding:3px 6px;font-size:0.75rem;width:90px;background:transparent;"
-            onchange="updateLineaContab(${i},'nit',this.value)">
+            onchange="updateLineaContab(${realIdx},'nit',this.value)">
         </td>
         <td style="padding:6px 4px;text-align:center;">
-          <button onclick="eliminarLineaContab(${i})" style="background:none;border:none;color:#d1d5db;cursor:pointer;font-size:0.85rem;" title="Eliminar">🗑</button>
+          <button onclick="eliminarLineaContab(${realIdx})" style="background:none;border:none;color:#d1d5db;cursor:pointer;font-size:0.85rem;" title="Eliminar">🗑</button>
         </td>
       </tr>`;
     }).join('');
