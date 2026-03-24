@@ -352,6 +352,38 @@
         </div>
       </div>
 
+      <!-- Panel verificación planilla (solo para egresos) -->
+      <div id="panelVerificacion" style="display:none;margin-bottom:18px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+          <span style="font-size:0.8rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.04em;">Verificación vs Planilla UGPP</span>
+          <button onclick="toggleVerificacion()" id="btnToggleVerif" style="background:none;border:1px solid var(--border);border-radius:5px;padding:2px 10px;font-size:0.75rem;cursor:pointer;color:var(--muted);">▼ Ver</button>
+        </div>
+        <div id="panelVerifDetalle" style="display:none;">
+          <table style="width:100%;border-collapse:collapse;font-size:0.79rem;margin-bottom:8px;">
+            <thead>
+              <tr style="background:#f8fafc;">
+                <th style="padding:7px 10px;text-align:left;font-size:0.68rem;font-weight:700;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border);">PUC</th>
+                <th style="padding:7px 10px;text-align:left;font-size:0.68rem;font-weight:700;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border);">NIT</th>
+                <th style="padding:7px 10px;text-align:left;font-size:0.68rem;font-weight:700;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border);">Entidad</th>
+                <th style="padding:7px 10px;text-align:right;font-size:0.68rem;font-weight:700;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border);">Planilla</th>
+                <th style="padding:7px 10px;text-align:right;font-size:0.68rem;font-weight:700;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border);">Comprobante</th>
+                <th style="padding:7px 10px;text-align:right;font-size:0.68rem;font-weight:700;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border);">Diferencia</th>
+              </tr>
+            </thead>
+            <tbody id="verifTabla"></tbody>
+            <tfoot>
+              <tr style="background:#f0fdf4;font-weight:700;border-top:2px solid var(--border);">
+                <td colspan="3" style="padding:7px 10px;font-size:0.8rem;">TOTAL</td>
+                <td style="padding:7px 10px;text-align:right;color:var(--accent);" id="verifTotPlanilla"></td>
+                <td style="padding:7px 10px;text-align:right;color:var(--accent);" id="verifTotComp"></td>
+                <td style="padding:7px 10px;text-align:right;font-weight:700;" id="verifTotDiff"></td>
+              </tr>
+            </tfoot>
+          </table>
+          <div id="verifMensaje" style="text-align:center;font-size:0.88rem;font-weight:700;padding:8px;border-radius:6px;"></div>
+        </div>
+      </div>
+
       <!-- Tabla contable -->
       <table style="width:100%;border-collapse:collapse;font-size:0.83rem;margin-bottom:10px;">
         <thead>
@@ -1615,6 +1647,11 @@
 
     renderLineasContab();
     cerrarPlanillaEgreso();
+
+    // Actualizar panel de verificación con datos reales de la planilla XLS
+    const datosPlanilla = cruceXLSTotales.entidades || [];
+    mostrarPanelVerificacion(datosPlanilla);
+
     mostrarToast('✓ Comprobante — planilla ' + cruceXLSNoPlanilla + ' — ' + registros.length + ' afiliados — ' + (contabLineasData.length - 1) + ' líneas');
   }
 
@@ -1695,6 +1732,19 @@
     } else {
       contabLineasData = generarLineasAuto(m, prog);
       console.log('Generando líneas automáticas (nuevo comprobante)');
+    }
+
+    // Panel verificación: construir desde líneas del comprobante si es egreso planilla
+    const esPlanilla = m.concepto === 'Planillas Pagadas' && Number(m.monto) < 0;
+    if (esPlanilla && contabLineasData.length > 0) {
+      // Reconstruir verifDatosPlanilla desde las líneas débito del comprobante
+      const datosPlanilla = contabLineasData
+        .filter(l => Number(l.deb) > 0 && l.nit)
+        .map(l => ({ puc: l.puc, nit: l.nit, nombre: l.desc, valor: Number(l.deb) }));
+      mostrarPanelVerificacion(datosPlanilla);
+    } else {
+      document.getElementById('panelVerificacion').style.display = 'none';
+      verifDatosPlanilla = [];
     }
 
     renderLineasContab();
@@ -1826,6 +1876,115 @@
       diffEl.textContent = `⚠️ Diferencia: ${formatCOP(diff)}`;
       diffEl.style.color = 'var(--danger)';
     }
+    // Actualizar panel de verificación si está visible
+    actualizarPanelVerificacion();
+  }
+
+  // ── Panel verificación planilla ───────────────────────────
+  let verifDatosPlanilla = []; // { puc, nit, nombre, valor } desde planilla UGPP
+
+  function toggleVerificacion() {
+    const det = document.getElementById('panelVerifDetalle');
+    const btn = document.getElementById('btnToggleVerif');
+    if (det.style.display === 'none') {
+      det.style.display = 'block';
+      btn.textContent = '▲ Ocultar';
+      actualizarPanelVerificacion();
+    } else {
+      det.style.display = 'none';
+      btn.textContent = '▼ Ver';
+    }
+  }
+
+  function mostrarPanelVerificacion(datosPlanilla) {
+    verifDatosPlanilla = datosPlanilla || [];
+    const panel = document.getElementById('panelVerificacion');
+    if (verifDatosPlanilla.length > 0) {
+      panel.style.display = 'block';
+      // Auto-abrir
+      document.getElementById('panelVerifDetalle').style.display = 'block';
+      document.getElementById('btnToggleVerif').textContent = '▲ Ocultar';
+      actualizarPanelVerificacion();
+    } else {
+      panel.style.display = 'none';
+    }
+  }
+
+  function actualizarPanelVerificacion() {
+    if (!verifDatosPlanilla.length) return;
+    const det = document.getElementById('panelVerifDetalle');
+    if (det.style.display === 'none') return;
+
+    // Acumular valores del comprobante actual por NIT
+    const compPorNIT = {};
+    contabLineasData.forEach(l => {
+      if (!l.nit || l.deb <= 0) return;
+      if (!compPorNIT[l.nit]) compPorNIT[l.nit] = 0;
+      compPorNIT[l.nit] += Number(l.deb) || 0;
+    });
+
+    // Construir tabla comparativa
+    let html = '';
+    let totPlanilla = 0, totComp = 0;
+
+    // Agrupar planilla por NIT
+    const planPorNIT = {};
+    verifDatosPlanilla.forEach(e => {
+      if (!planPorNIT[e.nit]) planPorNIT[e.nit] = { puc: e.puc, nombre: e.nombre, valor: 0 };
+      planPorNIT[e.nit].valor += Number(e.valor) || 0;
+    });
+
+    Object.entries(planPorNIT).forEach(([nit, pd]) => {
+      const vComp = compPorNIT[nit] || 0;
+      const diff  = vComp - pd.valor;
+      const ok    = Math.abs(diff) < 1;
+      const fillRow = ok ? '' : 'background:#fef2f2;';
+      totPlanilla += pd.valor;
+      totComp     += vComp;
+      html += `<tr style="border-bottom:1px solid #f1f3f5;${fillRow}">
+        <td style="padding:6px 10px;">${pd.puc}</td>
+        <td style="padding:6px 10px;font-size:0.75rem;">${nit}</td>
+        <td style="padding:6px 10px;">${pd.nombre}</td>
+        <td style="padding:6px 10px;text-align:right;">${formatCOP(pd.valor)}</td>
+        <td style="padding:6px 10px;text-align:right;${vComp>0?'':'color:var(--danger);'}">${vComp>0?formatCOP(vComp):'—'}</td>
+        <td style="padding:6px 10px;text-align:right;font-weight:600;color:${ok?'var(--accent)':'var(--danger)'};">${ok?'✅':formatCOP2(diff)}</td>
+      </tr>`;
+    });
+
+    // Entidades en comprobante que no están en planilla
+    Object.entries(compPorNIT).forEach(([nit, val]) => {
+      if (planPorNIT[nit]) return;
+      totComp += val;
+      html += `<tr style="border-bottom:1px solid #f1f3f5;background:#fff8e1;">
+        <td style="padding:6px 10px;color:var(--muted);">—</td>
+        <td style="padding:6px 10px;font-size:0.75rem;">${nit}</td>
+        <td style="padding:6px 10px;color:#92400e;">⚠️ No está en planilla</td>
+        <td style="padding:6px 10px;text-align:right;">—</td>
+        <td style="padding:6px 10px;text-align:right;">${formatCOP(val)}</td>
+        <td style="padding:6px 10px;text-align:right;color:var(--danger);font-weight:600;">${formatCOP2(val)}</td>
+      </tr>`;
+    });
+
+    document.getElementById('verifTabla').innerHTML     = html;
+    document.getElementById('verifTotPlanilla').textContent = formatCOP(totPlanilla);
+    document.getElementById('verifTotComp').textContent     = formatCOP(totComp);
+
+    const diffTotal = totComp - totPlanilla;
+    const okTotal   = Math.abs(diffTotal) < 1;
+    const diffEl    = document.getElementById('verifTotDiff');
+    diffEl.textContent = okTotal ? '✅' : formatCOP2(diffTotal);
+    diffEl.style.color = okTotal ? 'var(--accent)' : 'var(--danger)';
+
+    const msg = document.getElementById('verifMensaje');
+    if (okTotal) {
+      msg.textContent = '✅ Comprobante cuadra perfectamente con la planilla UGPP';
+      msg.style.background = '#f0fdf4';
+      msg.style.color = '#166534';
+    } else {
+      msg.textContent = `⚠️ Diferencia de ${formatCOP2(diffTotal)} entre comprobante y planilla UGPP`;
+      msg.style.background = '#fef2f2';
+      msg.style.color = 'var(--danger)';
+    }
   }
 
   async function guardarComprobante() {
@@ -1874,6 +2033,9 @@
     document.getElementById('modalContab').style.display = 'none';
     contabMovId = null;
     contabLineasData = [];
+    verifDatosPlanilla = [];
+    document.getElementById('panelVerificacion').style.display = 'none';
+    document.getElementById('panelVerifDetalle').style.display = 'none';
     // Limpiar slots dinámicos
     const s1 = document.getElementById('btnTerceroSlot');
     const s2 = document.getElementById('btnCruceSlot');
