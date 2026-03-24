@@ -1721,17 +1721,25 @@
 
     if (comps && comps.length > 0 && comps[0].lineas) {
       try {
-        contabLineasData = typeof comps[0].lineas === 'string'
+        const parsed = typeof comps[0].lineas === 'string'
           ? JSON.parse(comps[0].lineas)
           : comps[0].lineas;
-        console.log('✅ Comprobante cargado desde BD —', contabLineasData.length, 'líneas');
+        // Solo usar si tiene líneas reales con valores
+        if (parsed && parsed.length > 0) {
+          contabLineasData = parsed;
+          console.log('✅ Comprobante cargado desde BD —', contabLineasData.length, 'líneas');
+        } else {
+          contabLineasData = generarLineasAuto(m, prog);
+          console.log('BD vacío — generando líneas automáticas');
+        }
       } catch(e) {
         console.error('Error parseando líneas:', e);
         contabLineasData = generarLineasAuto(m, prog);
       }
     } else {
+      // No existe comprobante → generar automático
       contabLineasData = generarLineasAuto(m, prog);
-      console.log('Generando líneas automáticas (nuevo comprobante)');
+      console.log('Nuevo comprobante — generando líneas automáticas');
     }
 
     // Panel verificación: construir desde líneas del comprobante si es egreso planilla
@@ -2005,9 +2013,7 @@
     const m = movimientos.find(x => String(x.id) === String(contabMovId));
     if (!m) { mostrarToast('⚠️ No se encontró el movimiento', true); return; }
 
-    console.log('Guardando comprobante mov_id:', contabMovId, 'planilla:', planilla);
-
-    const { error: e1 } = await sb.from('comprobantes').insert([{
+    const comprobanteData = {
       mov_id:          contabMovId,
       fecha:           m.fecha_orden || null,
       cuenta:          m.cuenta      || null,
@@ -2017,11 +2023,30 @@
       tipo:            Number(m.monto) >= 0 ? 'ingreso' : 'egreso',
       estado:          'borrador',
       lineas:          JSON.stringify(contabLineasData)
-    }], { returning: 'minimal' });
+    };
 
-    if (e1) {
-      console.error('Error Supabase comprobantes:', e1);
-      mostrarToast('Error guardando comprobante: ' + (e1.message || e1.code || JSON.stringify(e1)), true);
+    // Verificar si ya existe para hacer UPDATE en lugar de INSERT
+    const { data: existente } = await sb
+      .from('comprobantes')
+      .select('id')
+      .eq('mov_id', contabMovId)
+      .limit(1);
+
+    let error;
+    if (existente && existente.length > 0) {
+      console.log('Actualizando comprobante existente id:', existente[0].id);
+      ({ error } = await sb.from('comprobantes')
+        .update(comprobanteData)
+        .eq('mov_id', contabMovId));
+    } else {
+      console.log('Insertando nuevo comprobante');
+      ({ error } = await sb.from('comprobantes')
+        .insert([comprobanteData], { returning: 'minimal' }));
+    }
+
+    if (error) {
+      console.error('Error Supabase comprobantes:', error);
+      mostrarToast('Error guardando comprobante: ' + (error.message || error.code || JSON.stringify(error)), true);
       return;
     }
 
