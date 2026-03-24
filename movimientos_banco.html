@@ -555,19 +555,19 @@
         </div>
 
         <!-- Resumen verificación por entidad (informativo) -->
-        <div style="margin-bottom:6px;">
-          <div style="font-size:0.8rem;font-weight:600;color:var(--muted);text-transform:uppercase;margin-bottom:6px;">
+        <div style="margin-bottom:14px;">
+          <div style="font-size:0.8rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.04em;margin-bottom:6px;">
             Verificación vs Planilla UGPP
           </div>
           <div style="border:1px solid var(--border);border-radius:8px;overflow:hidden;">
             <table style="width:100%;border-collapse:collapse;font-size:0.79rem;">
               <thead>
                 <tr style="background:#f8fafc;">
-                  <th style="padding:7px 10px;text-align:left;font-size:0.68rem;font-weight:700;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border);">Código</th>
-                  <th style="padding:7px 10px;text-align:left;font-size:0.68rem;font-weight:700;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border);">NIT</th>
+                  <th style="padding:7px 10px;text-align:left;font-size:0.68rem;font-weight:700;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border);width:70px;">Código</th>
+                  <th style="padding:7px 10px;text-align:left;font-size:0.68rem;font-weight:700;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border);width:110px;">NIT</th>
                   <th style="padding:7px 10px;text-align:left;font-size:0.68rem;font-weight:700;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border);">Entidad</th>
-                  <th style="padding:7px 10px;text-align:right;font-size:0.68rem;font-weight:700;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border);">Afiliados</th>
-                  <th style="padding:7px 10px;text-align:right;font-size:0.68rem;font-weight:700;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border);">Valor</th>
+                  <th style="padding:7px 10px;text-align:right;font-size:0.68rem;font-weight:700;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border);width:80px;">Afiliados</th>
+                  <th style="padding:7px 10px;text-align:right;font-size:0.68rem;font-weight:700;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border);width:120px;">Valor a pagar</th>
                 </tr>
               </thead>
               <tbody id="peVerifTabla"></tbody>
@@ -582,7 +582,7 @@
           </div>
         </div>
 
-        <div style="margin-top:6px;font-size:0.78rem;color:var(--muted);" id="peSinCIMsg"></div>
+        <!-- Tabla de cruce CCs vs CIs -->
 
       </div><!-- /step2 -->
     </div><!-- /body -->
@@ -1443,40 +1443,59 @@
         agregarEntidades(acumCCF, '28150504');
 
         const totalDetalle = entidades.reduce((s, e) => s + e.valor, 0);
-        cruceXLSTotales = { entidades, total: totalDetalle };
+        cruceXLSTotales = { entidades, total: totalDetalle, resumen: resumenEntidades };
 
-        // ── Leer resumen por entidad desde hojas de Totales ─
-        // Para la tabla informativa: código, NIT, nombre, afiliados, valor
-        // Estructura: col 0=nombre, col 1=NIT, col 3=afiliados, col 4 o 5=valor
-        const resumenEntidades = []; // { codigo, nit, nombre, afiliados, valor }
-        const HOJAS_RESUMEN = [
-          { hoja: 'Totales Salud',   colVal: 4, colAfil: 3 },
-          { hoja: 'Totales Pension', colVal: 5, colAfil: 3 },
-          { hoja: 'Totales Riesgos', colVal: 4, colAfil: 3 },
-          { hoja: 'Totales Cajas',   colVal: 4, colAfil: 3 },
-        ];
-        // Mapa NIT → código de entidad desde hojas de totales (col 0 tiene el código en algunos formatos)
-        // Mejor usar el archivo resumen XLS de ASOPAGOS si está disponible
-        // Por ahora extraer desde las hojas Totales del RpPlanillas
-        for (const cfg of HOJAS_RESUMEN) {
-          const ws = wb.Sheets[cfg.hoja];
+        // ── Resumen por entidad para tabla informativa ──────
+        // Código: col 13=EPS, col 15=AFP, col 17=CCF, col 19=ARL
+        // Nombre: col 14=EPS, col 16=AFP, col 18=CCF, col 20=ARL
+        // Valor:  col 75=EPS, col 70=AFP, col 85=ARL, col 93=CCF
+        // NIT: cruzar nombre del Detalle con hojas de Totales
+
+        // 1. Mapa nombre → NIT desde todas las hojas de Totales
+        const nomANIT = {};
+        for (const h of ['Totales Salud','Totales Pension','Totales Riesgos','Totales Cajas']) {
+          const ws = wb.Sheets[h];
           if (!ws) continue;
           const rows = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: '' });
           for (let i = 3; i < rows.length; i++) {
-            const r = rows[i];
-            const nombreRaw = String(r[0] || '').trim();
-            const nit       = String(r[1] || '').trim().replace(/\D/g, '');
-            const afiliados = Number(r[cfg.colAfil]) || 0;
-            const valor     = Number(r[cfg.colVal])  || 0;
-            if (!nombreRaw || !nit || valor <= 0) continue;
-            if (nombreRaw.toLowerCase().startsWith('sin ')) continue;
-            const nitLimpio = nit;
-            const nombreOf  = NOMBRES_NIT[nitLimpio] || nombreRaw.replace(/\s+/g,' ').trim();
-            resumenEntidades.push({ nit: nitLimpio, nombre: nombreOf, afiliados, valor });
+            const nom = String(rows[i][0] || '').trim();
+            const nit = String(rows[i][1] || '').trim().replace(/\D/g,'');
+            if (nom && nit && nit !== '0') nomANIT[nom] = nit;
           }
         }
-        // Ordenar por NIT para consistencia
-        resumenEntidades.sort((a,b) => a.nit.localeCompare(b.nit));
+
+        // 2. Acumular por código desde Detalle Planilla
+        const acumResumen = {}; // { codigo: { codigo, nit, nombre, afiliados, valor } }
+        for (let i = 3; i < detRows.length; i++) {
+          const r = detRows[i];
+          const cc = r[1] ? String(r[1]).trim() : '';
+          if (!cc) continue;
+          // [cod_col, nom_col, val_col]
+          for (const [codCol, nomCol, valCol] of [[13,14,75],[19,20,85],[15,16,70],[17,18,93]]) {
+            const cod = String(r[codCol] || '').trim();
+            const nom = String(r[nomCol] || '').trim();
+            const val = Number(r[valCol]) || 0;
+            if (!cod || cod.toLowerCase().startsWith('sin') || val <= 0) continue;
+            if (!acumResumen[cod]) {
+              // Buscar NIT: primero por nombre exacto, luego parcial
+              let nit = nomANIT[nom] || '';
+              if (!nit) {
+                const clave = Object.keys(nomANIT).find(k =>
+                  k.toLowerCase().includes(nom.toLowerCase().slice(0,8)) ||
+                  nom.toLowerCase().includes(k.toLowerCase().slice(0,8))
+                );
+                if (clave) nit = nomANIT[clave];
+              }
+              // Usar NOMBRES_NIT para nombre oficial
+              const nombreOf = NOMBRES_NIT[nit] || nom.replace(/\s+/g,' ').trim();
+              acumResumen[cod] = { codigo: cod, nit, nombre: nombreOf, afiliados: 0, valor: 0 };
+            }
+            acumResumen[cod].afiliados += 1;
+            acumResumen[cod].valor     += val;
+          }
+        }
+        // Ordenar por código
+        const resumenEntidades = Object.values(acumResumen).sort((a,b) => a.codigo.localeCompare(b.codigo));
 
         // ── 5. Buscar CIs en ingreso_programa por CC ──────────
         // Buscar en el mes del período Y en meses adyacentes (±1)
@@ -1626,9 +1645,11 @@
     if (verifData.length > 0) {
       let vHtml = '';
       let totAfil = 0, totValor = 0;
-      verifData.forEach(e => {
-        vHtml += '<tr style="border-bottom:1px solid #f1f3f5;">'
-          + '<td style="padding:6px 10px;font-size:0.75rem;color:var(--muted);">' + e.nit + '</td>'
+      verifData.forEach((e, idx) => {
+        const bg = idx % 2 === 0 ? '' : 'background:#f8fafc;';
+        vHtml += '<tr style="border-bottom:1px solid #f1f3f5;' + bg + '">'
+          + '<td style="padding:6px 10px;font-weight:600;font-size:0.78rem;">' + esc(e.codigo) + '</td>'
+          + '<td style="padding:6px 10px;font-size:0.75rem;color:var(--muted);">' + esc(e.nit) + '</td>'
           + '<td style="padding:6px 10px;">' + esc(e.nombre) + '</td>'
           + '<td style="padding:6px 10px;text-align:right;">' + e.afiliados + '</td>'
           + '<td style="padding:6px 10px;text-align:right;font-weight:600;">' + formatCOP(e.valor) + '</td>'
@@ -1636,7 +1657,7 @@
         totAfil  += e.afiliados;
         totValor += e.valor;
       });
-      document.getElementById('peVerifTabla').innerHTML     = vHtml;
+      document.getElementById('peVerifTabla').innerHTML      = vHtml;
       document.getElementById('peVerifCantTotal').textContent = totAfil;
       document.getElementById('peVerifValorTotal').textContent = formatCOP(totValor);
     }
@@ -1807,6 +1828,72 @@
     }
 
     renderLineasContab();
+
+    // Si es egreso de planilla ya guardado → mostrar resumen desde BD
+    if (esPlanillaPagada && contabLineasData.length > 0) {
+      const planillaNum = document.getElementById('contabPlanilla').value.trim();
+      if (planillaNum) {
+        // Reconstruir resumen agrupando líneas débito por descripción/nit
+        const acumVerif = {};
+        contabLineasData.forEach(l => {
+          if (Number(l.deb) <= 0) return;
+          const nit  = l.nit || (String(l.desc||'').match(/^(\d{7,12})\s*[—\-]/) || [])[1] || '';
+          const desc = l.desc || '';
+          const key  = nit || desc;
+          if (!key) return;
+          if (!acumVerif[key]) acumVerif[key] = { codigo: l.puc||'', nit, nombre: desc, afiliados: 0, valor: 0 };
+          acumVerif[key].valor += Number(l.deb);
+          acumVerif[key].afiliados += 1;
+        });
+        const verifReconstruido = Object.values(acumVerif).sort((a,b) => a.nombre.localeCompare(b.nombre));
+        if (verifReconstruido.length > 0) {
+          let vHtml = '';
+          let totAfil = 0, totValor = 0;
+          verifReconstruido.forEach((e, idx) => {
+            const bg = idx % 2 === 0 ? '' : 'background:#f8fafc;';
+            vHtml += '<tr style="border-bottom:1px solid #f1f3f5;' + bg + '">'
+              + '<td style="padding:6px 10px;font-weight:600;font-size:0.78rem;">' + esc(e.codigo) + '</td>'
+              + '<td style="padding:6px 10px;font-size:0.75rem;color:var(--muted);">' + esc(e.nit) + '</td>'
+              + '<td style="padding:6px 10px;">' + esc(e.nombre) + '</td>'
+              + '<td style="padding:6px 10px;text-align:right;">' + e.afiliados + '</td>'
+              + '<td style="padding:6px 10px;text-align:right;font-weight:600;">' + formatCOP(e.valor) + '</td>'
+              + '</tr>';
+            totAfil  += e.afiliados;
+            totValor += e.valor;
+          });
+          // Mostrar panel de verificación dentro del modal del comprobante
+          let panelVerif = document.getElementById('panelVerifEnModal');
+          if (!panelVerif) {
+            const tablaContable = document.querySelector('#contabLineas').closest('table');
+            tablaContable.insertAdjacentHTML('beforebegin',
+              '<div id="panelVerifEnModal" style="margin-bottom:16px;">'
+              + '<div style="font-size:0.78rem;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:6px;">Verificación vs Planilla UGPP — ' + planillaNum + '</div>'
+              + '<div style="border:1px solid var(--border);border-radius:8px;overflow:hidden;">'
+              + '<table style="width:100%;border-collapse:collapse;font-size:0.78rem;">'
+              + '<thead><tr style="background:#f8fafc;">'
+              + '<th style="padding:6px 10px;text-align:left;font-size:0.67rem;font-weight:700;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border);">Código</th>'
+              + '<th style="padding:6px 10px;text-align:left;font-size:0.67rem;font-weight:700;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border);">NIT</th>'
+              + '<th style="padding:6px 10px;text-align:left;font-size:0.67rem;font-weight:700;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border);">Entidad</th>'
+              + '<th style="padding:6px 10px;text-align:right;font-size:0.67rem;font-weight:700;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border);">Afiliados</th>'
+              + '<th style="padding:6px 10px;text-align:right;font-size:0.67rem;font-weight:700;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border);">Valor a pagar</th>'
+              + '</tr></thead>'
+              + '<tbody id="panelVerifBody"></tbody>'
+              + '<tfoot><tr style="background:#f0fdf4;font-weight:700;border-top:2px solid var(--border);">'
+              + '<td colspan="3" style="padding:6px 10px;">TOTAL</td>'
+              + '<td style="padding:6px 10px;text-align:right;color:var(--accent);" id="panelVerifTotAfil"></td>'
+              + '<td style="padding:6px 10px;text-align:right;color:var(--accent);" id="panelVerifTotValor"></td>'
+              + '</tr></tfoot>'
+              + '</table></div></div>'
+            );
+            panelVerif = document.getElementById('panelVerifEnModal');
+          }
+          document.getElementById('panelVerifBody').innerHTML     = vHtml;
+          document.getElementById('panelVerifTotAfil').textContent = totAfil;
+          document.getElementById('panelVerifTotValor').textContent = formatCOP(totValor);
+        }
+      }
+    }
+
     document.getElementById('modalContab').style.display = 'flex';
   }
 
@@ -2000,6 +2087,9 @@
     document.getElementById('modalContab').style.display = 'none';
     contabMovId = null;
     contabLineasData = [];
+    // Limpiar panel verificación si existe
+    const p = document.getElementById('panelVerifEnModal');
+    if (p) p.remove();
     // Limpiar slots dinámicos
     const s1 = document.getElementById('btnTerceroSlot');
     const s2 = document.getElementById('btnCruceSlot');
