@@ -1934,22 +1934,19 @@
         const parsed = typeof comps[0].lineas === 'string'
           ? JSON.parse(comps[0].lineas)
           : comps[0].lineas;
-        // Solo usar si tiene líneas reales con valores
         if (parsed && parsed.length > 0) {
           contabLineasData = parsed;
           console.log('✅ Comprobante cargado desde BD —', contabLineasData.length, 'líneas');
         } else {
-          contabLineasData = generarLineasAuto(m, prog);
-          console.log('BD vacío — generando líneas automáticas');
+          contabLineasData = await cargarLineasNuevas(m, prog);
         }
       } catch(e) {
         console.error('Error parseando líneas:', e);
-        contabLineasData = generarLineasAuto(m, prog);
+        contabLineasData = await cargarLineasNuevas(m, prog);
       }
     } else {
-      // No existe comprobante → generar automático
-      contabLineasData = generarLineasAuto(m, prog);
-      console.log('Nuevo comprobante — generando líneas automáticas');
+      contabLineasData = await cargarLineasNuevas(m, prog);
+      console.log('Nuevo comprobante — generando líneas');
     }
 
     renderLineasContab();
@@ -2014,6 +2011,46 @@
     document.getElementById('panelVerifBody').innerHTML      = vHtml;
     document.getElementById('panelVerifTotAfil').textContent  = totAfil;
     document.getElementById('panelVerifTotValor').textContent = formatCOP(totValor);
+  }
+
+  // ── API afiliaciones ──────────────────────────────────────
+  const SION_API = 'https://afiliaciones.multiservice.com.co/api_sion.php';
+  const SION_KEY = 'SIONUCE2026';
+
+  async function cargarLineasNuevas(m, prog) {
+    // Para CIs de Seguridad Social, intentar cargar desde API
+    const recibo = prog ? prog.recibo : null;
+    if (recibo && m.concepto === 'Seguridad Social') {
+      const lineasAPI = await cargarLineasDesdeAPI(recibo);
+      if (lineasAPI && lineasAPI.length > 0) {
+        console.log('✅ Líneas cargadas desde API —', lineasAPI.length, 'líneas');
+        return lineasAPI;
+      }
+    }
+    // Fallback: generar automático
+    return generarLineasAuto(m, prog);
+  }
+
+  async function cargarLineasDesdeAPI(recibo) {
+    // Recibo puede ser "CI-00000021627" o "00000021627"
+    const reciboNum = String(recibo).replace(/[^0-9]/g,'');
+    const reciboFmt = 'CI-' + reciboNum.padStart(11,'0');
+    try {
+      const resp = await fetch(`${SION_API}?key=${SION_KEY}&accion=comprobante&recibo=${reciboFmt}`);
+      const json = await resp.json();
+      if (!json.ok || !json.data || json.data.length === 0) return null;
+      // Convertir formato API → formato contabLineasData
+      return json.data.map(l => ({
+        puc:  l.puc  || '',
+        desc: l.descripcion || '',
+        deb:  Number(l.debito)  || 0,
+        cred: Number(l.credito) || 0,
+        nit:  l.nit  || '',
+      }));
+    } catch(e) {
+      console.warn('API afiliaciones no disponible:', e.message);
+      return null;
+    }
   }
 
   function generarLineasAuto(m, prog) {
