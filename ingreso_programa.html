@@ -218,7 +218,7 @@
 
   <!-- Acciones importar -->
   <div class="acciones" id="accionesDiv" style="display:none;">
-    <button class="btn btn-primary" onclick="importarNuevos()">⬆ Importar <span id="btnCount">0</span> registros nuevos</button>
+    <button class="btn btn-primary" onclick="importarNuevos()">⬆ Importar/Actualizar <span id="btnCount">0</span> registros</button>
     <button class="btn btn-secondary" onclick="cancelarImport()">✕ Cancelar</button>
   </div>
 
@@ -570,7 +570,7 @@
         document.getElementById('sNuevos').textContent     = nuevos.length;
         document.getElementById('sDuplicados').textContent = duplicados.length;
         document.getElementById('sTotalValor').textContent = formatCOP(totalValor);
-        document.getElementById('btnCount').textContent    = nuevos.length;
+        document.getElementById('btnCount').textContent = nuevos.length + duplicados.length;
 
         document.getElementById('resumenDiv').style.display  = 'grid';
         document.getElementById('filtrosDiv').style.display  = 'flex';
@@ -597,15 +597,27 @@
     reader.readAsArrayBuffer(archivo);
   }
 
-  // ── Importar nuevos ───────────────────────────────────────
+  // ── Importar / Actualizar ─────────────────────────────────
   async function importarNuevos() {
-    if (nuevos.length === 0) return;
+    const todos = [...nuevos, ...duplicados];
+    if (todos.length === 0) return;
     mostrarToast('⏳ Guardando...');
-    for (let i = 0; i < nuevos.length; i += 100) {
-      const { error } = await sb.from('ingreso_programa').insert(nuevos.slice(i, i+100));
+
+    // Upsert: inserta nuevos y actualiza existentes con nombres/NITs
+    const camposActualizar = [
+      'eps_val','arl_val','afp_val','ccf_val',
+      'eps_nombre','arl_nombre','afp_nombre','ccf_nombre',
+      'eps_nit','arl_nit','afp_nit','ccf_nit',
+      'fsp','admon','total','total_ss','banco','detalle','periodo'
+    ];
+
+    for (let i = 0; i < todos.length; i += 100) {
+      const lote = todos.slice(i, i+100);
+      const { error } = await sb.from('ingreso_programa')
+        .upsert(lote, { onConflict: 'recibo', ignoreDuplicates: false });
       if (error) { mostrarToast('Error: ' + error.message, true); console.error(error); return; }
     }
-    mostrarToast(`✅ ${nuevos.length} registros importados`);
+    mostrarToast(`✅ ${nuevos.length} nuevos + ${duplicados.length} actualizados`);
     document.getElementById('accionesDiv').style.display = 'none';
     await cargarRegistros();
   }
