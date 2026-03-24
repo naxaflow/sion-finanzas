@@ -695,6 +695,8 @@
     'sb_publishable_szrMuEOOopjJUTo0hgUfhQ_v_idMvXI'
   );
 
+  function esc(s) { return (s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
   const CONCEPTOS = [
     '', 'Costo Fijo', 'Devoluciones', 'Gastos Bancarios', 'Hernan',
     'Incapacidad', 'Inc-Pagada', 'Ingreso Intereses', 'Mayor v/pagado',
