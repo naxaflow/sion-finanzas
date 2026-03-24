@@ -1638,49 +1638,66 @@
     return null;
   }
 
-  function abrirContabilizar(id) {
+  async function abrirContabilizar(id) {
     const m = movimientos.find(x => String(x.id) === String(id));
-    if (!m) return;
+    if (!m) { mostrarToast('Movimiento no encontrado', true); return; }
     contabMovId = id;
 
     const prog = m.recibo ? buscarEnCache(m.recibo) : null;
-    const tieneCI = m.recibo && m.recibo.toUpperCase().includes('CI-');
+    const tieneCI = m.recibo && String(m.recibo).toUpperCase().includes('CI-');
 
     // Encabezado
     document.getElementById('contabRecibo').textContent   = m.recibo || '—';
-    document.getElementById('contabCC').textContent       = prog ? prog.cc || '—' : '—';
-    document.getElementById('contabAfiliado').textContent = prog ? prog.afiliado || '—' : (m.descripcion || '—');
+    document.getElementById('contabCC').textContent       = prog ? (prog.cc || '—') : '—';
+    document.getElementById('contabAfiliado').textContent = prog ? (prog.afiliado || '—') : (m.descripcion || '—');
     document.getElementById('contabPlanilla').value       = m.numero_planilla || '';
-    document.getElementById('contabEstado').textContent   = m.contabilizado ? '✅ Ya contabilizado' : '';
+    document.getElementById('contabEstado').innerHTML     = m.contabilizado
+      ? '<span style="color:var(--accent);">✅ Ya contabilizado</span>' : '';
 
-    // Botón buscar/crear tercero — solo si no tiene CI
-    let btnTerceroHTML = '';
-    if (!tieneCI) {
-      btnTerceroHTML = '<button onclick="abrirTercero()" style="margin-left:8px;padding:3px 10px;border-radius:5px;border:1px solid var(--accent);background:white;color:var(--accent);font-size:0.78rem;cursor:pointer;">👤 Asignar tercero</button>';
-    }
-    // Inyectar botón junto al campo CC
+    // Botón tercero
     const ccCell = document.getElementById('contabCC');
-    ccCell.insertAdjacentHTML('afterend', '<span id="btnTerceroSlot"></span>');
-    const slot = document.getElementById('btnTerceroSlot');
-    if (slot) slot.innerHTML = btnTerceroHTML;
+    let slot = document.getElementById('btnTerceroSlot');
+    if (!slot) { ccCell.insertAdjacentHTML('afterend', '<span id="btnTerceroSlot"></span>'); slot = document.getElementById('btnTerceroSlot'); }
+    slot.innerHTML = !tieneCI
+      ? '<button onclick="abrirTercero()" style="margin-left:8px;padding:3px 10px;border-radius:5px;border:1px solid var(--accent);background:white;color:var(--accent);font-size:0.78rem;cursor:pointer;">👤 Asignar tercero</button>'
+      : '';
 
-    // Botón cruce planilla — solo si es egreso de Planillas Pagadas
+    // Botón cruce planilla UGPP
     const esPlanillaPagada = m.concepto === 'Planillas Pagadas' && Number(m.monto) < 0;
-    let btnCruceHTML = '';
-    if (esPlanillaPagada) {
-      btnCruceHTML = '<button onclick="abrirCruceEgreso(' + Math.abs(Number(m.monto)) + ')" '
-        + 'style="margin-left:8px;padding:3px 10px;border-radius:5px;border:1px solid #2563eb;background:white;color:#2563eb;font-size:0.78rem;cursor:pointer;">📂 Subir planilla UGPP</button>';
-    }
-    const planillaInput = document.getElementById('contabPlanilla');
-    // Limpiar slot anterior si existe
     const oldSlot = document.getElementById('btnCruceSlot');
     if (oldSlot) oldSlot.remove();
-    planillaInput.insertAdjacentHTML('afterend', '<span id="btnCruceSlot">' + btnCruceHTML + '</span>');
+    const planillaInput = document.getElementById('contabPlanilla');
+    planillaInput.insertAdjacentHTML('afterend', '<span id="btnCruceSlot">'
+      + (esPlanillaPagada
+        ? '<button onclick="abrirCruceEgreso(' + Math.abs(Number(m.monto)) + ')" style="margin-left:8px;padding:3px 10px;border-radius:5px;border:1px solid #2563eb;background:white;color:#2563eb;font-size:0.78rem;cursor:pointer;">📂 Subir planilla UGPP</button>'
+        : '')
+      + '</span>');
 
-    // Generar líneas
-    contabLineasData = generarLineasAuto(m, prog);
+    // ── Cargar comprobante guardado o generar automático ──────
+    contabLineasData = [];
+    const { data: comps } = await sb
+      .from('comprobantes')
+      .select('lineas, created_at')
+      .eq('mov_id', id)
+      .order('created_at', { ascending: false })
+      .limit(1);
+
+    if (comps && comps.length > 0 && comps[0].lineas) {
+      try {
+        contabLineasData = typeof comps[0].lineas === 'string'
+          ? JSON.parse(comps[0].lineas)
+          : comps[0].lineas;
+        console.log('✅ Comprobante cargado desde BD —', contabLineasData.length, 'líneas');
+      } catch(e) {
+        console.error('Error parseando líneas:', e);
+        contabLineasData = generarLineasAuto(m, prog);
+      }
+    } else {
+      contabLineasData = generarLineasAuto(m, prog);
+      console.log('Generando líneas automáticas (nuevo comprobante)');
+    }
+
     renderLineasContab();
-
     document.getElementById('modalContab').style.display = 'flex';
   }
 
