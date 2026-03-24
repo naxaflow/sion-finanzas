@@ -535,31 +535,9 @@
           </div>
         </div>
 
-        <!-- Tabla de cruce CCs vs CIs -->
-        <div style="font-size:0.8rem;font-weight:600;color:var(--muted);text-transform:uppercase;margin-bottom:6px;display:flex;justify-content:space-between;">
-          <span>Cruce CC → CI</span>
-          <span id="peCruceResumen"></span>
-        </div>
-        <div style="max-height:200px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;margin-bottom:14px;">
-          <table style="width:100%;border-collapse:collapse;font-size:0.8rem;">
-            <thead style="position:sticky;top:0;">
-              <tr style="background:#f8fafc;">
-                <th style="padding:7px 10px;text-align:left;font-size:0.68rem;font-weight:700;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border);">CC (planilla)</th>
-                <th style="padding:7px 10px;text-align:left;font-size:0.68rem;font-weight:700;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border);">Nombre (planilla)</th>
-                <th style="padding:7px 10px;text-align:left;font-size:0.68rem;font-weight:700;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border);">CI encontrado</th>
-                <th style="padding:7px 10px;text-align:left;font-size:0.68rem;font-weight:700;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border);">Afiliado en programa</th>
-                <th style="padding:7px 10px;text-align:right;font-size:0.68rem;font-weight:700;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border);">Total SS</th>
-              </tr>
-            </thead>
-            <tbody id="peCruceTabla"></tbody>
-          </table>
-        </div>
-
         <!-- Resumen verificación por entidad (informativo) -->
         <div style="margin-bottom:14px;">
-          <div style="font-size:0.8rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.04em;margin-bottom:6px;">
-            Verificación vs Planilla UGPP
-          </div>
+          <div style="font-size:0.8rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.04em;margin-bottom:6px;">Verificación vs Planilla UGPP</div>
           <div style="border:1px solid var(--border);border-radius:8px;overflow:hidden;">
             <table style="width:100%;border-collapse:collapse;font-size:0.79rem;">
               <thead>
@@ -583,7 +561,26 @@
           </div>
         </div>
 
-        <!-- Tabla de cruce CCs vs CIs -->
+        <!-- Tabla cruce CC → CI -->
+        <div style="font-size:0.8rem;font-weight:600;color:var(--muted);text-transform:uppercase;margin-bottom:6px;display:flex;justify-content:space-between;">
+          <span>Cruce CC → CI</span>
+          <span id="peCruceResumen"></span>
+        </div>
+        <div style="max-height:200px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;margin-bottom:10px;">
+          <table style="width:100%;border-collapse:collapse;font-size:0.8rem;">
+            <thead style="position:sticky;top:0;">
+              <tr style="background:#f8fafc;">
+                <th style="padding:7px 10px;text-align:left;font-size:0.68rem;font-weight:700;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border);">CC (planilla)</th>
+                <th style="padding:7px 10px;text-align:left;font-size:0.68rem;font-weight:700;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border);">Nombre (planilla)</th>
+                <th style="padding:7px 10px;text-align:left;font-size:0.68rem;font-weight:700;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border);">CI encontrado</th>
+                <th style="padding:7px 10px;text-align:left;font-size:0.68rem;font-weight:700;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border);">Afiliado en programa</th>
+                <th style="padding:7px 10px;text-align:right;font-size:0.68rem;font-weight:700;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border);">Total SS</th>
+              </tr>
+            </thead>
+            <tbody id="peCruceTabla"></tbody>
+          </table>
+        </div>
+        <div style="font-size:0.78rem;color:var(--muted);" id="peSinCIMsg"></div>
 
       </div><!-- /step2 -->
     </div><!-- /body -->
