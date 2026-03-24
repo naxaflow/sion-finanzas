@@ -194,6 +194,7 @@
     <button class="btn btn-primary" onclick="agregarManual()">+ Agregar movimiento</button>
     <button class="btn btn-excel" onclick="exportarExcel()">⬇ Exportar Excel</button>
     <button class="btn" style="background:#4b5563;" onclick="generarPlantilla()">📋 Descargar Plantilla</button>
+    <button class="btn" style="background:#7c3aed;color:white;" onclick="abrirExportadorContabilidad()">📤 Exportar Contabilidad</button>
   </div>
 
   <div class="upload-zone" id="uploadHint" onclick="document.getElementById('excelFile').click()">
@@ -591,6 +592,94 @@
       <button onclick="peVolver()" style="padding:7px 14px;border-radius:6px;border:1px solid var(--border);background:white;font-size:0.83rem;cursor:pointer;display:none;" id="peBtnVolver">← Subir otro archivo</button>
       <span style="font-size:0.79rem;color:var(--muted);" id="peFooterMsg"></span>
       <button onclick="usarCruceEnComprobante()" id="peBtnUsar" style="display:none;padding:8px 18px;border-radius:7px;border:none;background:var(--accent);color:white;font-size:0.85rem;font-weight:600;cursor:pointer;">✓ Aplicar cruce al comprobante</button>
+    </div>
+
+  </div>
+</div>
+
+<!-- Modal Exportador Contabilidad -->
+<div id="modalExportador" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:5000;align-items:center;justify-content:center;">
+  <div style="background:white;border-radius:12px;width:95%;max-width:680px;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,0.3);">
+
+    <div style="padding:16px 24px;background:var(--header-bg);color:white;border-radius:12px 12px 0 0;display:flex;justify-content:space-between;align-items:center;">
+      <div>
+        <h3 style="font-size:0.95rem;font-weight:700;">📤 Exportar a Contabilidad</h3>
+        <p style="font-size:0.75rem;opacity:0.65;margin-top:2px;">Comprobantes aprobados → CSV formato contable</p>
+      </div>
+      <button onclick="cerrarExportador()" style="background:none;border:none;color:white;font-size:1.2rem;cursor:pointer;">✕</button>
+    </div>
+
+    <div style="padding:22px 24px;overflow-y:auto;flex:1;">
+
+      <!-- Parámetros -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:20px;">
+        <div>
+          <label style="font-size:0.78rem;color:var(--muted);font-weight:600;display:block;margin-bottom:5px;">Fecha desde</label>
+          <input type="date" id="expFechaDesde" style="width:100%;border:1px solid var(--border);border-radius:6px;padding:8px 12px;font-size:0.88rem;outline:none;">
+        </div>
+        <div>
+          <label style="font-size:0.78rem;color:var(--muted);font-weight:600;display:block;margin-bottom:5px;">Fecha hasta</label>
+          <input type="date" id="expFechaHasta" style="width:100%;border:1px solid var(--border);border-radius:6px;padding:8px 12px;font-size:0.88rem;outline:none;">
+        </div>
+        <div>
+          <label style="font-size:0.78rem;color:var(--muted);font-weight:600;display:block;margin-bottom:5px;">Número CN inicial <span style="color:var(--danger);">*</span></label>
+          <div style="display:flex;align-items:center;gap:6px;">
+            <span style="font-weight:600;color:var(--muted);">CN-0</span>
+            <input type="number" id="expCNInicial" placeholder="26059" min="1"
+              style="flex:1;border:1px solid var(--border);border-radius:6px;padding:8px 10px;font-size:0.88rem;outline:none;font-weight:700;">
+          </div>
+        </div>
+        <div>
+          <label style="font-size:0.78rem;color:var(--muted);font-weight:600;display:block;margin-bottom:5px;">Solo no exportados</label>
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-top:8px;">
+            <input type="checkbox" id="expSoloNuevos" checked style="width:16px;height:16px;cursor:pointer;">
+            <span style="font-size:0.85rem;">Excluir ya exportados</span>
+          </label>
+        </div>
+      </div>
+
+      <button onclick="buscarComprobantesExportar()" class="btn btn-primary" style="width:100%;margin-bottom:16px;">
+        🔍 Buscar comprobantes aprobados
+      </button>
+
+      <!-- Resultado búsqueda -->
+      <div id="expResultado" style="display:none;">
+        <div style="background:#f8fafc;border:1px solid var(--border);border-radius:8px;padding:12px 16px;margin-bottom:14px;">
+          <div style="display:flex;gap:24px;flex-wrap:wrap;font-size:0.85rem;">
+            <span><span style="color:var(--muted);font-weight:600;">Comprobantes: </span><span id="expCantTotal" style="font-weight:700;color:#2563eb;"></span></span>
+            <span><span style="color:var(--muted);font-weight:600;">Ingresos (CI): </span><span id="expCantCI" style="font-weight:700;color:var(--accent);"></span></span>
+            <span><span style="color:var(--muted);font-weight:600;">Egresos (CN): </span><span id="expCantCN" style="font-weight:700;color:var(--debit);"></span></span>
+            <span><span style="color:var(--muted);font-weight:600;">Líneas CSV: </span><span id="expCantLineas" style="font-weight:700;"></span></span>
+          </div>
+        </div>
+
+        <!-- Lista de comprobantes -->
+        <div style="max-height:280px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;margin-bottom:14px;">
+          <table style="width:100%;border-collapse:collapse;font-size:0.79rem;">
+            <thead style="position:sticky;top:0;">
+              <tr style="background:#f8fafc;">
+                <th style="padding:7px 10px;text-align:left;font-size:0.68rem;font-weight:700;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border);">Doc</th>
+                <th style="padding:7px 10px;text-align:left;font-size:0.68rem;font-weight:700;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border);">Fecha</th>
+                <th style="padding:7px 10px;text-align:left;font-size:0.68rem;font-weight:700;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border);">Descripción</th>
+                <th style="padding:7px 10px;text-align:right;font-size:0.68rem;font-weight:700;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border);">Total</th>
+                <th style="padding:7px 10px;text-align:center;font-size:0.68rem;font-weight:700;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border);">CN asignado</th>
+              </tr>
+            </thead>
+            <tbody id="expTabla"></tbody>
+          </table>
+        </div>
+
+        <div id="expWarning" style="display:none;background:#fff8e1;border:1px solid #fcd34d;border-radius:6px;padding:10px 14px;font-size:0.82rem;color:#92400e;margin-bottom:14px;"></div>
+      </div>
+
+    </div>
+
+    <div style="padding:14px 24px;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;">
+      <span style="font-size:0.78rem;color:var(--muted);" id="expEstado"></span>
+      <div style="display:flex;gap:10px;">
+        <button onclick="cerrarExportador()" style="padding:8px 16px;border-radius:7px;border:1px solid var(--border);background:white;cursor:pointer;font-size:0.85rem;">Cancelar</button>
+        <button onclick="ejecutarExportacion()" id="btnEjecutarExp" style="display:none;padding:8px 18px;border-radius:7px;border:none;background:#7c3aed;color:white;cursor:pointer;font-size:0.85rem;font-weight:600;">⬇ Descargar CSV</button>
+      </div>
     </div>
 
   </div>
@@ -2442,7 +2531,225 @@
     return (num < 0 ? '-' : '') + Math.abs(num).toLocaleString('es-CO');
   }
 
-  function esc(s) { return (s||'').replace(/"/g,'&quot;').replace(/</g,'&lt;'); }
+  // ── Exportador Contabilidad ───────────────────────────────
+  let expComprobantes = []; // comprobantes encontrados para exportar
+
+  function abrirExportadorContabilidad() {
+    expComprobantes = [];
+    // Prellenar fechas con el mes actual seleccionado
+    const mes  = document.getElementById('selectMes').value;
+    const anio = document.getElementById('selectAnio').value;
+    if (mes && anio) {
+      const desde = `${anio}-${mes}-01`;
+      const ultimo = new Date(parseInt(anio), parseInt(mes), 0).getDate();
+      const hasta  = `${anio}-${mes}-${String(ultimo).padStart(2,'0')}`;
+      document.getElementById('expFechaDesde').value = desde;
+      document.getElementById('expFechaHasta').value = hasta;
+    }
+    document.getElementById('expResultado').style.display = 'none';
+    document.getElementById('btnEjecutarExp').style.display = 'none';
+    document.getElementById('expEstado').textContent = '';
+    document.getElementById('expCNInicial').value = '';
+    document.getElementById('modalExportador').style.display = 'flex';
+  }
+
+  function cerrarExportador() {
+    document.getElementById('modalExportador').style.display = 'none';
+  }
+
+  async function buscarComprobantesExportar() {
+    const desde     = document.getElementById('expFechaDesde').value;
+    const hasta     = document.getElementById('expFechaHasta').value;
+    const soloNuevos = document.getElementById('expSoloNuevos').checked;
+    const cnInicial  = document.getElementById('expCNInicial').value.trim();
+
+    if (!desde || !hasta) { mostrarToast('⚠️ Seleccioná rango de fechas', true); return; }
+    if (!cnInicial) { mostrarToast('⚠️ Ingresá el número CN inicial', true); return; }
+
+    mostrarToast('⏳ Buscando comprobantes...');
+    document.getElementById('expEstado').textContent = 'Buscando...';
+
+    let query = sb.from('comprobantes')
+      .select('*')
+      .eq('estado', 'aprobado')
+      .gte('fecha', desde)
+      .lte('fecha', hasta)
+      .order('fecha', { ascending: true })
+      .order('created_at', { ascending: true });
+
+    if (soloNuevos) query = query.eq('exportado', false);
+
+    const { data, error } = await query;
+    if (error) { mostrarToast('Error: ' + error.message, true); return; }
+
+    // Filtrar solo los que cuadran (débito = crédito)
+    expComprobantes = (data || []).filter(c => {
+      const lineas = typeof c.lineas === 'string' ? JSON.parse(c.lineas || '[]') : (c.lineas || []);
+      const totDeb  = lineas.reduce((s,l) => s + (Number(l.deb)||0), 0);
+      const totCred = lineas.reduce((s,l) => s + (Number(l.cred)||0), 0);
+      return Math.abs(totDeb - totCred) < 1 && lineas.length > 0;
+    }).map(c => ({
+      ...c,
+      lineas: typeof c.lineas === 'string' ? JSON.parse(c.lineas) : c.lineas
+    }));
+
+    if (expComprobantes.length === 0) {
+      mostrarToast('No hay comprobantes aprobados en ese rango', true);
+      document.getElementById('expResultado').style.display = 'none';
+      document.getElementById('btnEjecutarExp').style.display = 'none';
+      document.getElementById('expEstado').textContent = 'Sin resultados';
+      return;
+    }
+
+    // Asignar números CN
+    let cnNum = parseInt(cnInicial);
+    expComprobantes.forEach(c => {
+      c._cn = 'CN-0' + String(cnNum).padStart(5, '0');
+      cnNum++;
+    });
+
+    // Renderizar tabla
+    const cantCI = expComprobantes.filter(c => c.tipo === 'ingreso').length;
+    const cantCN = expComprobantes.filter(c => c.tipo === 'egreso').length;
+    const totalLineas = expComprobantes.reduce((s,c) => s + c.lineas.length, 0);
+
+    document.getElementById('expCantTotal').textContent = expComprobantes.length;
+    document.getElementById('expCantCI').textContent    = cantCI;
+    document.getElementById('expCantCN').textContent    = cantCN;
+    document.getElementById('expCantLineas').textContent = totalLineas;
+
+    let tbodyHTML = '';
+    expComprobantes.forEach((c, i) => {
+      const totDeb = c.lineas.reduce((s,l) => s + (Number(l.deb)||0), 0);
+      const bg = i % 2 === 0 ? '' : 'background:#f8fafc;';
+      tbodyHTML += '<tr style="border-bottom:1px solid #f1f3f5;' + bg + '">'
+        + '<td style="padding:6px 10px;font-weight:600;color:' + (c.tipo==='ingreso'?'var(--accent)':'var(--debit)') + ';">'
+        + (c.tipo === 'ingreso' ? (c.recibo || 'CI') : c._cn) + '</td>'
+        + '<td style="padding:6px 10px;">' + fechaISOaDisplay(c.fecha) + '</td>'
+        + '<td style="padding:6px 10px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="' + esc(c.descripcion||'') + '">'
+        + esc((c.descripcion || c.numero_planilla || '').substring(0,40)) + '</td>'
+        + '<td style="padding:6px 10px;text-align:right;font-weight:600;">' + formatCOP(totDeb) + '</td>'
+        + '<td style="padding:6px 10px;text-align:center;font-size:0.75rem;color:var(--muted);">'
+        + (c.tipo === 'egreso' ? '<span style="font-weight:600;color:#7c3aed;">' + c._cn + '</span>' : '—') + '</td>'
+        + '</tr>';
+    });
+    document.getElementById('expTabla').innerHTML = tbodyHTML;
+
+    // Advertencias
+    const yaExportados = (data||[]).filter(c => c.exportado).length;
+    const noBalanceados = (data||[]).length - expComprobantes.length - yaExportados;
+    let warnings = [];
+    if (yaExportados > 0 && !soloNuevos) warnings.push(`⚠️ ${yaExportados} ya fueron exportados anteriormente`);
+    if (noBalanceados > 0) warnings.push(`⚠️ ${noBalanceados} comprobantes excluidos por no cuadrar`);
+    const warnDiv = document.getElementById('expWarning');
+    if (warnings.length > 0) {
+      warnDiv.innerHTML = warnings.join('<br>');
+      warnDiv.style.display = 'block';
+    } else {
+      warnDiv.style.display = 'none';
+    }
+
+    document.getElementById('expResultado').style.display = 'block';
+    document.getElementById('btnEjecutarExp').style.display = 'inline-block';
+    document.getElementById('expEstado').textContent = expComprobantes.length + ' comprobantes listos';
+    mostrarToast('✅ ' + expComprobantes.length + ' comprobantes encontrados');
+  }
+
+  async function ejecutarExportacion() {
+    if (expComprobantes.length === 0) return;
+    const desde = document.getElementById('expFechaDesde').value;
+    const hasta  = document.getElementById('expFechaHasta').value;
+
+    mostrarToast('⏳ Generando CSV...');
+
+    const rows = [];
+    const TIPO_DOC = { ingreso: '30', egreso: '130' };
+    const FECHA_VACIA = '30/12/1899';
+
+    expComprobantes.forEach(c => {
+      const tipoDoc = TIPO_DOC[c.tipo] || '30';
+      // Para ingresos: número doc = recibo (CI-021772)
+      // Para egresos: número doc = CN asignado
+      const numDoc  = c.tipo === 'ingreso'
+        ? (c.recibo ? 'CI-0' + String(parseInt(c.recibo.replace(/\D/g,''))||0).padStart(5,'0') : c.recibo || '')
+        : c._cn;
+      const fechaDoc = c.fecha
+        ? (() => { const p = c.fecha.split('-'); return p[2]+'/'+p[1]+'/'+p[0]; })()
+        : '';
+      const desc = (c.descripcion || c.numero_planilla || '').toUpperCase();
+
+      // Para egresos de planilla → agrupar líneas débito por NIT (por entidad)
+      if (c.tipo === 'egreso' && c.numero_planilla) {
+        // Agrupar débitos por PUC+NIT
+        const acumDeb = {};
+        c.lineas.forEach(l => {
+          if (Number(l.deb) <= 0) return;
+          const nit = l.nit || (String(l.desc||'').match(/^(\d{7,12})\s*[—\-]/) || [])[1] || '';
+          const key = l.puc + '|' + nit;
+          if (!acumDeb[key]) acumDeb[key] = { puc: l.puc, nit, valor: 0 };
+          acumDeb[key].valor += Number(l.deb);
+        });
+        // Líneas débito por entidad
+        Object.values(acumDeb).forEach(e => {
+          rows.push(['6', fechaDoc, tipoDoc, numDoc, e.puc, '', desc,
+            e.valor.toFixed(4), '0.0000', '0.0000', e.nit, '', FECHA_VACIA, '', '', '', '', '0.0000', '', '0', '0', '', ''].join(';'));
+        });
+        // Línea crédito banco
+        c.lineas.filter(l => Number(l.cred) > 0).forEach(l => {
+          const nit = l.nit || '';
+          rows.push(['6', fechaDoc, tipoDoc, numDoc, l.puc, '', desc,
+            '0.0000', Number(l.cred).toFixed(4), '0.0000', nit, '', FECHA_VACIA, '', '', '', '', '0.0000', '', '0', '0', '', ''].join(';'));
+        });
+      } else {
+        // Ingresos y otros egresos → una línea por línea del comprobante
+        c.lineas.forEach(l => {
+          const deb  = Number(l.deb)  || 0;
+          const cred = Number(l.cred) || 0;
+          if (deb === 0 && cred === 0) return;
+          const nit = l.nit || (String(l.desc||'').match(/^(\d{7,12})\s*[—\-]/) || [])[1] || '';
+          const lineaDesc = (l.desc || desc).toUpperCase();
+          rows.push(['6', fechaDoc, tipoDoc, numDoc, l.puc || '', '', lineaDesc,
+            deb.toFixed(4), cred.toFixed(4), '0.0000', nit, '', FECHA_VACIA, '', '', '', '', '0.0000', '', '0', '0', '', ''].join(';'));
+        });
+      }
+    });
+
+    // Generar y descargar CSV
+    const csv  = rows.join('\r\n');
+    const blob = new Blob([csv], { type: 'text/plain;charset=utf-8;' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href     = url;
+    a.download = `Contabilidad_${desde}_${hasta}.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
+
+    // Marcar como exportados en BD
+    const lote = `${desde}_${hasta}_CN${expComprobantes[0]._cn}`;
+    const ids  = expComprobantes.map(c => c.id);
+    const cnMap = {};
+    expComprobantes.forEach(c => { cnMap[c.id] = c._cn; });
+
+    // Actualizar uno por uno para guardar el CN asignado
+    const ahora = new Date().toISOString();
+    for (const c of expComprobantes) {
+      await sb.from('comprobantes').update({
+        exportado: true,
+        fecha_exportacion: ahora,
+        lote_exportacion: lote,
+        numero_cn: c.tipo === 'egreso' ? c._cn : null,
+      }).eq('id', c.id);
+    }
+
+    mostrarToast('✅ CSV descargado — ' + rows.length + ' líneas — ' + expComprobantes.length + ' comprobantes marcados');
+    document.getElementById('expEstado').textContent = '✅ Exportado — ' + expComprobantes.length + ' comprobantes';
+    document.getElementById('btnEjecutarExp').style.display = 'none';
+  }
+
+  // Cerrar modal al hacer clic fuera
+  document.getElementById('modalExportador').addEventListener('click', function(e) {
+    if (e.target === this) cerrarExportador();
+  });
 
   function mostrarToast(msg, error=false) {
     const t = document.getElementById('toast');
