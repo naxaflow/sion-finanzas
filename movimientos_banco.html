@@ -1571,7 +1571,9 @@
             acumResumen[cod].valor     += val;
           }
         }
-        const resumenEntidades = Object.values(acumResumen).sort((a,b) => a.codigo.localeCompare(b.codigo));
+        const ORDEN_TIPO = {"EPS":1,"AFP":2,"ARL":3,"CCF":4};
+        function tipoEnt(c){if(c.startsWith("EPS")||c.startsWith("ESS")||c.startsWith("MIN"))return"EPS";if(c.startsWith("23")||c.startsWith("25"))return"AFP";if(c.startsWith("14"))return"ARL";if(c.startsWith("CCF"))return"CCF";return"ZZZ";}
+        const resumenEntidades = Object.values(acumResumen).sort((a,b)=>{const ta=ORDEN_TIPO[tipoEnt(a.codigo)]||9,tb=ORDEN_TIPO[tipoEnt(b.codigo)]||9;return ta!==tb?ta-tb:a.codigo.localeCompare(b.codigo);});
 
         // Ahora sí asignar cruceXLSTotales con resumenEntidades ya declarado
         cruceXLSTotales = { entidades, total: totalDetalle, resumen: resumenEntidades };
