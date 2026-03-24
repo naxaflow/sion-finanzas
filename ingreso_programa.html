@@ -344,6 +344,9 @@
 
       if (!json.ok) { mostrarToast('Error desde API: ' + (json.error || 'desconocido'), true); return; }
 
+      // Asegurar que registrosDB esté cargado antes de comparar
+      if (registrosDB.length === 0) await cargarRegistros();
+
       const recibosDB = new Set(registrosDB.map(r => r.recibo));
       const delAPI = json.data || [];
 
