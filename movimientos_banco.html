@@ -1534,15 +1534,8 @@
         agregarEntidades(acumCCF, '28150504');
 
         const totalDetalle = entidades.reduce((s, e) => s + e.valor, 0);
-        cruceXLSTotales = { entidades, total: totalDetalle, resumen: resumenEntidades };
 
         // ── Resumen por entidad para tabla informativa ──────
-        // Código: col 13=EPS, col 15=AFP, col 17=CCF, col 19=ARL
-        // Nombre: col 14=EPS, col 16=AFP, col 18=CCF, col 20=ARL
-        // Valor:  col 75=EPS, col 70=AFP, col 85=ARL, col 93=CCF
-        // NIT: cruzar nombre del Detalle con hojas de Totales
-
-        // 1. Mapa nombre → NIT desde todas las hojas de Totales
         const nomANIT = {};
         for (const h of ['Totales Salud','Totales Pension','Totales Riesgos','Totales Cajas']) {
           const ws = wb.Sheets[h];
@@ -1555,20 +1548,17 @@
           }
         }
 
-        // 2. Acumular por código desde Detalle Planilla
-        const acumResumen = {}; // { codigo: { codigo, nit, nombre, afiliados, valor } }
+        const acumResumen = {};
         for (let i = 3; i < detRows.length; i++) {
           const r = detRows[i];
           const cc = r[1] ? String(r[1]).trim() : '';
           if (!cc) continue;
-          // [cod_col, nom_col, val_col]
           for (const [codCol, nomCol, valCol] of [[13,14,75],[19,20,85],[15,16,70],[17,18,93]]) {
             const cod = String(r[codCol] || '').trim();
             const nom = String(r[nomCol] || '').trim();
             const val = Number(r[valCol]) || 0;
             if (!cod || cod.toLowerCase().startsWith('sin') || val <= 0) continue;
             if (!acumResumen[cod]) {
-              // Buscar NIT: primero por nombre exacto, luego parcial
               let nit = nomANIT[nom] || '';
               if (!nit) {
                 const clave = Object.keys(nomANIT).find(k =>
@@ -1577,7 +1567,6 @@
                 );
                 if (clave) nit = nomANIT[clave];
               }
-              // Usar NOMBRES_NIT para nombre oficial
               const nombreOf = NOMBRES_NIT[nit] || nom.replace(/\s+/g,' ').trim();
               acumResumen[cod] = { codigo: cod, nit, nombre: nombreOf, afiliados: 0, valor: 0 };
             }
@@ -1585,8 +1574,10 @@
             acumResumen[cod].valor     += val;
           }
         }
-        // Ordenar por código
         const resumenEntidades = Object.values(acumResumen).sort((a,b) => a.codigo.localeCompare(b.codigo));
+
+        // Ahora sí asignar cruceXLSTotales con resumenEntidades ya declarado
+        cruceXLSTotales = { entidades, total: totalDetalle, resumen: resumenEntidades };
 
         // ── 5. Buscar CIs en ingreso_programa por CC ──────────
         // Buscar en el mes del período Y en meses adyacentes (±1)
