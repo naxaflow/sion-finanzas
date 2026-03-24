@@ -1918,9 +1918,16 @@
     // Acumular valores del comprobante actual por NIT
     const compPorNIT = {};
     contabLineasData.forEach(l => {
-      if (!l.nit || l.deb <= 0) return;
-      if (!compPorNIT[l.nit]) compPorNIT[l.nit] = 0;
-      compPorNIT[l.nit] += Number(l.deb) || 0;
+      if (Number(l.deb) <= 0) return;
+      // NIT puede estar en l.nit o al inicio de l.desc (formato "860002183 — COLPATRIA ARL")
+      let nit = l.nit || '';
+      if (!nit && l.desc) {
+        const m = String(l.desc).match(/^(\d{7,12})\s*[—\-]/);
+        if (m) nit = m[1];
+      }
+      if (!nit) return;
+      if (!compPorNIT[nit]) compPorNIT[nit] = 0;
+      compPorNIT[nit] += Number(l.deb) || 0;
     });
 
     // Construir tabla comparativa
