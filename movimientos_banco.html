@@ -1816,9 +1816,35 @@
       document.getElementById('contabPlanilla').value = cruceXLSNoPlanilla;
     }
 
+    // Guardar resumen de verificación como metadata en las líneas
+    // para poder mostrarlo igual al reabrir el comprobante
+    if (cruceXLSTotales && cruceXLSTotales.resumen) {
+      contabLineasData.push({ _resumen: cruceXLSTotales.resumen });
+    }
+
     renderLineasContab();
     cerrarPlanillaEgreso();
-    mostrarToast('✓ Comprobante — planilla ' + cruceXLSNoPlanilla + ' — ' + registros.length + ' afiliados — ' + (contabLineasData.length - 1) + ' líneas');
+
+    // Mostrar panel de verificación en el comprobante inmediatamente
+    if (cruceXLSTotales && cruceXLSTotales.resumen && cruceXLSTotales.resumen.length > 0) {
+      const planillaNum = cruceXLSNoPlanilla;
+      let vHtml = '', totAfil = 0, totValor = 0;
+      cruceXLSTotales.resumen.forEach((e, idx) => {
+        const bg = idx % 2 === 0 ? '' : 'background:#f8fafc;';
+        vHtml += '<tr style="border-bottom:1px solid #f1f3f5;' + bg + '">'
+          + '<td style="padding:6px 10px;font-weight:600;font-size:0.78rem;">' + esc(e.codigo) + '</td>'
+          + '<td style="padding:6px 10px;font-size:0.75rem;color:var(--muted);">' + esc(e.nit) + '</td>'
+          + '<td style="padding:6px 10px;">' + esc(e.nombre) + '</td>'
+          + '<td style="padding:6px 10px;text-align:right;">' + e.afiliados + '</td>'
+          + '<td style="padding:6px 10px;text-align:right;font-weight:600;">' + formatCOP(e.valor) + '</td>'
+          + '</tr>';
+        totAfil += e.afiliados;
+        totValor += e.valor;
+      });
+      mostrarPanelVerifEnModal(planillaNum, vHtml, totAfil, totValor);
+    }
+
+    mostrarToast('✓ Comprobante — planilla ' + cruceXLSNoPlanilla + ' — ' + registros.length + ' afiliados — ' + (contabLineasData.length - 2) + ' líneas');
   }
 
   // Extrae el número CI del texto del recibo (ej: "01. Mar No._CI-00000021627-..." → "00000021627")
@@ -1910,35 +1936,22 @@
 
     renderLineasContab();
 
-    // Si es egreso de planilla ya guardado → mostrar resumen desde BD
+    // Si es egreso de planilla → mostrar panel de verificación
     if (esPlanillaPagada && contabLineasData.length > 0) {
       const planillaNum = document.getElementById('contabPlanilla').value.trim();
       if (planillaNum) {
-        // Reconstruir resumen agrupando líneas débito por descripción/nit
-        const acumVerif = {};
-        contabLineasData.forEach(l => {
-          if (Number(l.deb) <= 0) return;
-          const nit  = l.nit || (String(l.desc||'').match(/^(\d{7,12})\s*[—\-]/) || [])[1] || '';
-          const desc = l.desc || '';
-          const key  = (l.puc||'') + '|' + (nit || desc);
-          if (!key) return;
-          if (!acumVerif[key]) acumVerif[key] = { puc: l.puc||'', nit, nombre: desc, afiliados: 0, valor: 0 };
-          acumVerif[key].valor += Number(l.deb);
-          acumVerif[key].afiliados += 1;
-        });
-        // Ordenar por PUC: 28150501=EPS, 28150503=AFP, 28150502=ARL, 28150504=CCF
-        const ORDEN_PUC = {'28150501':1,'28150503':2,'28150502':3,'28150504':4};
-        const verifReconstruido = Object.values(acumVerif).sort((a,b) => {
-          const pa = ORDEN_PUC[a.puc]||9, pb = ORDEN_PUC[b.puc]||9;
-          return pa !== pb ? pa - pb : a.nombre.localeCompare(b.nombre);
-        });
-        if (verifReconstruido.length > 0) {
+        // Extraer resumen guardado como metadata (_resumen) en las líneas
+        const resumenGuardado = contabLineasData.find(l => l._resumen);
+        const verifData = resumenGuardado ? resumenGuardado._resumen : null;
+
+        if (verifData && verifData.length > 0) {
+          // Usar el resumen guardado directamente — igual que en el modal de cruce
           let vHtml = '';
           let totAfil = 0, totValor = 0;
-          verifReconstruido.forEach((e, idx) => {
+          verifData.forEach((e, idx) => {
             const bg = idx % 2 === 0 ? '' : 'background:#f8fafc;';
             vHtml += '<tr style="border-bottom:1px solid #f1f3f5;' + bg + '">'
-              + '<td style="padding:6px 10px;font-weight:600;font-size:0.78rem;">' + esc(e.puc) + '</td>'
+              + '<td style="padding:6px 10px;font-weight:600;font-size:0.78rem;">' + esc(e.codigo) + '</td>'
               + '<td style="padding:6px 10px;font-size:0.75rem;color:var(--muted);">' + esc(e.nit) + '</td>'
               + '<td style="padding:6px 10px;">' + esc(e.nombre) + '</td>'
               + '<td style="padding:6px 10px;text-align:right;">' + e.afiliados + '</td>'
@@ -1947,40 +1960,42 @@
             totAfil  += e.afiliados;
             totValor += e.valor;
           });
-          // Mostrar panel de verificación dentro del modal del comprobante
-          let panelVerif = document.getElementById('panelVerifEnModal');
-          if (!panelVerif) {
-            const tablaContable = document.querySelector('#contabLineas').closest('table');
-            tablaContable.insertAdjacentHTML('beforebegin',
-              '<div id="panelVerifEnModal" style="margin-bottom:16px;">'
-              + '<div style="font-size:0.78rem;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:6px;">Verificación vs Planilla UGPP — ' + planillaNum + '</div>'
-              + '<div style="border:1px solid var(--border);border-radius:8px;overflow:hidden;">'
-              + '<table style="width:100%;border-collapse:collapse;font-size:0.78rem;">'
-              + '<thead><tr style="background:#f8fafc;">'
-              + '<th style="padding:6px 10px;text-align:left;font-size:0.67rem;font-weight:700;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border);">PUC</th>'
-              + '<th style="padding:6px 10px;text-align:left;font-size:0.67rem;font-weight:700;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border);">NIT</th>'
-              + '<th style="padding:6px 10px;text-align:left;font-size:0.67rem;font-weight:700;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border);">Entidad</th>'
-              + '<th style="padding:6px 10px;text-align:right;font-size:0.67rem;font-weight:700;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border);">Afiliados</th>'
-              + '<th style="padding:6px 10px;text-align:right;font-size:0.67rem;font-weight:700;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border);">Valor a pagar</th>'
-              + '</tr></thead>'
-              + '<tbody id="panelVerifBody"></tbody>'
-              + '<tfoot><tr style="background:#f0fdf4;font-weight:700;border-top:2px solid var(--border);">'
-              + '<td colspan="3" style="padding:6px 10px;">TOTAL</td>'
-              + '<td style="padding:6px 10px;text-align:right;color:var(--accent);" id="panelVerifTotAfil"></td>'
-              + '<td style="padding:6px 10px;text-align:right;color:var(--accent);" id="panelVerifTotValor"></td>'
-              + '</tr></tfoot>'
-              + '</table></div></div>'
-            );
-            panelVerif = document.getElementById('panelVerifEnModal');
-          }
-          document.getElementById('panelVerifBody').innerHTML      = vHtml;
-          document.getElementById('panelVerifTotAfil').textContent  = totAfil;
-          document.getElementById('panelVerifTotValor').textContent = formatCOP(totValor);
+          mostrarPanelVerifEnModal(planillaNum, vHtml, totAfil, totValor);
         }
       }
     }
 
     document.getElementById('modalContab').style.display = 'flex';
+  }
+
+  function mostrarPanelVerifEnModal(planillaNum, vHtml, totAfil, totValor) {
+    let panelVerif = document.getElementById('panelVerifEnModal');
+    if (!panelVerif) {
+      const tablaContable = document.querySelector('#contabLineas').closest('table');
+      tablaContable.insertAdjacentHTML('beforebegin',
+        '<div id="panelVerifEnModal" style="margin-bottom:16px;">'
+        + '<div style="font-size:0.78rem;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:6px;">Verificación vs Planilla UGPP — ' + planillaNum + '</div>'
+        + '<div style="border:1px solid var(--border);border-radius:8px;overflow:hidden;">'
+        + '<table style="width:100%;border-collapse:collapse;font-size:0.78rem;">'
+        + '<thead><tr style="background:#f8fafc;">'
+        + '<th style="padding:6px 10px;text-align:left;font-size:0.67rem;font-weight:700;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border);">Código</th>'
+        + '<th style="padding:6px 10px;text-align:left;font-size:0.67rem;font-weight:700;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border);">NIT</th>'
+        + '<th style="padding:6px 10px;text-align:left;font-size:0.67rem;font-weight:700;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border);">Entidad</th>'
+        + '<th style="padding:6px 10px;text-align:right;font-size:0.67rem;font-weight:700;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border);">Afiliados</th>'
+        + '<th style="padding:6px 10px;text-align:right;font-size:0.67rem;font-weight:700;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border);">Valor a pagar</th>'
+        + '</tr></thead>'
+        + '<tbody id="panelVerifBody"></tbody>'
+        + '<tfoot><tr style="background:#f0fdf4;font-weight:700;border-top:2px solid var(--border);">'
+        + '<td colspan="3" style="padding:6px 10px;">TOTAL</td>'
+        + '<td style="padding:6px 10px;text-align:right;color:var(--accent);" id="panelVerifTotAfil"></td>'
+        + '<td style="padding:6px 10px;text-align:right;color:var(--accent);" id="panelVerifTotValor"></td>'
+        + '</tr></tfoot>'
+        + '</table></div></div>'
+      );
+    }
+    document.getElementById('panelVerifBody').innerHTML      = vHtml;
+    document.getElementById('panelVerifTotAfil').textContent  = totAfil;
+    document.getElementById('panelVerifTotValor').textContent = formatCOP(totValor);
   }
 
   function generarLineasAuto(m, prog) {
@@ -2049,7 +2064,7 @@
 
   function renderLineasContab() {
     const tbody = document.getElementById('contabLineas');
-    tbody.innerHTML = contabLineasData.map((l, i) => `
+    tbody.innerHTML = contabLineasData.filter(l => !l._resumen).map((l, i) => `
       <tr style="border-bottom:1px solid #f1f3f5;">
         <td style="padding:6px 8px;">
           <input value="${l.puc}" placeholder="Cta PUC" data-idx="${i}" data-field="puc"
@@ -2095,8 +2110,9 @@
   }
 
   function actualizarTotalesContab() {
-    const totDeb  = contabLineasData.reduce((s,l) => s + (Number(l.deb)||0), 0);
-    const totCred = contabLineasData.reduce((s,l) => s + (Number(l.cred)||0), 0);
+    const lineas  = contabLineasData.filter(l => !l._resumen);
+    const totDeb  = lineas.reduce((s,l) => s + (Number(l.deb)||0), 0);
+    const totCred = lineas.reduce((s,l) => s + (Number(l.cred)||0), 0);
     const diff    = totDeb - totCred;
     document.getElementById('contabTotalDeb').textContent  = formatCOP(totDeb);
     document.getElementById('contabTotalCred').textContent = formatCOP(totCred);
@@ -2111,8 +2127,8 @@
   }
 
   async function guardarComprobante() {
-    const totDeb  = contabLineasData.reduce((s,l) => s + (Number(l.deb)||0), 0);
-    const totCred = contabLineasData.reduce((s,l) => s + (Number(l.cred)||0), 0);
+    const totDeb  = contabLineasData.filter(l=>!l._resumen).reduce((s,l) => s + (Number(l.deb)||0), 0);
+    const totCred = contabLineasData.filter(l=>!l._resumen).reduce((s,l) => s + (Number(l.cred)||0), 0);
     if (Math.abs(totDeb - totCred) >= 1) {
       mostrarToast('⚠️ El comprobante no cuadra — revisa los valores', true); return;
     }
