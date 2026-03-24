@@ -329,7 +329,7 @@
 
 <!-- Modal Contabilizar -->
 <div class="modal-overlay" id="modalContab" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:3000;align-items:center;justify-content:center;">
-  <div style="background:white;border-radius:12px;width:95%;max-width:860px;max-height:92vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,0.3);">
+  <div style="background:white;border-radius:12px;width:98%;max-width:1100px;max-height:92vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,0.3);">
     
     <!-- Header -->
     <div style="padding:16px 24px;background:var(--header-bg);color:white;border-radius:12px 12px 0 0;display:flex;justify-content:space-between;align-items:center;">
@@ -362,12 +362,12 @@
         <thead>
           <tr style="background:#1e3a5f;color:white;">
             <th style="padding:8px 10px;text-align:center;font-size:0.7rem;font-weight:700;width:30px;">No.</th>
-            <th style="padding:8px 10px;text-align:left;font-size:0.7rem;font-weight:700;width:130px;">Cuenta</th>
+            <th style="padding:8px 10px;text-align:left;font-size:0.7rem;font-weight:700;width:150px;">Cuenta</th>
             <th style="padding:8px 10px;text-align:left;font-size:0.7rem;font-weight:700;">Observaciones</th>
-            <th style="padding:8px 10px;text-align:right;font-size:0.7rem;font-weight:700;width:110px;">Débito</th>
-            <th style="padding:8px 10px;text-align:right;font-size:0.7rem;font-weight:700;width:110px;">Crédito</th>
-            <th style="padding:8px 10px;text-align:left;font-size:0.7rem;font-weight:700;width:160px;">Tercero</th>
-            <th style="padding:8px 10px;text-align:left;font-size:0.7rem;font-weight:700;width:100px;">NIT</th>
+            <th style="padding:8px 10px;text-align:right;font-size:0.7rem;font-weight:700;width:120px;">Débito</th>
+            <th style="padding:8px 10px;text-align:right;font-size:0.7rem;font-weight:700;width:120px;">Crédito</th>
+            <th style="padding:8px 10px;text-align:left;font-size:0.7rem;font-weight:700;width:180px;">Tercero</th>
+            <th style="padding:8px 10px;text-align:left;font-size:0.7rem;font-weight:700;width:120px;">NIT</th>
             <th style="padding:8px 10px;width:24px;"></th>
           </tr>
         </thead>
@@ -704,7 +704,8 @@
   const CONCEPTOS = [
     '', 'Costo Fijo', 'Devoluciones', 'Gastos Bancarios', 'Hernan',
     'Incapacidad', 'Inc-Pagada', 'Ingreso Intereses', 'Mayor v/pagado',
-    'Otros gastos', 'Otros Ingresos', 'Planillas Pagadas', 'Seguridad Social'
+    'Nota Contabilidad', 'Nomina', 'Otros gastos', 'Otros Ingresos',
+    'Planillas Pagadas', 'Seguridad Social'
   ];
 
   let movimientos = [];
@@ -1165,6 +1166,17 @@
     document.getElementById('btnUsarTercero').style.display = 'none';
     mostrarBuscarTercero();
     document.getElementById('modalTercero').style.display = 'flex';
+  }
+
+  function abrirTerceroConNIT(nit) {
+    terceroEncontrado = null;
+    document.getElementById('terceroNumInput').value = nit || '';
+    document.getElementById('terceroResultado').innerHTML = '';
+    document.getElementById('btnUsarTercero').style.display = 'none';
+    mostrarBuscarTercero();
+    document.getElementById('modalTercero').style.display = 'flex';
+    // Auto-buscar si tiene NIT
+    if (nit) buscarTercero();
   }
 
   function cerrarTercero() {
@@ -2164,9 +2176,14 @@
             onchange="updateLineaContab(${realIdx},'_tercero',this.value)">
         </td>
         <td style="padding:6px 8px;">
-          <input value="${esc(l.nit||'')}" placeholder="NIT"
-            style="border:1px solid var(--border);border-radius:4px;padding:3px 6px;font-size:0.75rem;width:90px;background:transparent;"
-            onchange="updateLineaContab(${realIdx},'nit',this.value)">
+          <div style="display:flex;align-items:center;gap:4px;">
+            <input value="${esc(l.nit||'')}" placeholder="NIT"
+              style="border:1px solid var(--border);border-radius:4px;padding:3px 6px;font-size:0.75rem;width:85px;background:transparent;"
+              onchange="updateLineaContab(${realIdx},'nit',this.value)">
+            <button onclick="abrirTerceroConNIT('${esc(l.nit||'')}')" 
+              title="Buscar/crear tercero"
+              style="background:none;border:1px solid var(--border);border-radius:4px;padding:2px 5px;cursor:pointer;font-size:0.75rem;color:var(--muted);">👤</button>
+          </div>
         </td>
         <td style="padding:6px 4px;text-align:center;">
           <button onclick="eliminarLineaContab(${realIdx})" style="background:none;border:none;color:#d1d5db;cursor:pointer;font-size:0.85rem;" title="Eliminar">🗑</button>
@@ -2764,10 +2781,17 @@
 
     const rows = [];
     const TIPO_DOC = { ingreso: '30', egreso: '130' };
+    // Override por concepto
+    const tipoDocPorConcepto = {
+      'Seguridad Social': '30',
+      'Planillas Pagadas': '130',
+      'Nota Contabilidad': '210',
+      'Nomina': '60',
+    };
     const FECHA_VACIA = '30/12/1899';
 
     expComprobantes.forEach(c => {
-      const tipoDoc = TIPO_DOC[c.tipo] || '30';
+      const tipoDoc = tipoDocPorConcepto[c.concepto || ''] || TIPO_DOC[c.tipo] || '30';
       // Para ingresos: número doc = recibo (CI-021772)
       // Para egresos: número doc = CN asignado
       const numDoc  = c.tipo === 'ingreso'
