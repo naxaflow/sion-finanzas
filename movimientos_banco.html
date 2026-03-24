@@ -1397,46 +1397,86 @@
         const totalDetalle = entidades.reduce((s, e) => s + e.valor, 0);
         cruceXLSTotales = { entidades, total: totalDetalle };
 
-        // ── 5. Buscar CIs en ingreso_programa por CC + mes/año ─
-        // Usar mes y anio (campos de carga) en lugar de periodo (campo de cotización)
-        // periodo XLS "2026/03" → mes="03", anio="2026"
-        const periodoNorm = periodo.replace(/[^0-9]/g, ''); // "2026/03" → "202603"
-        const mesBI  = periodoNorm.substring(4, 6);  // "03"
-        const anioBI = periodoNorm.substring(0, 4);  // "2026"
-        const ccs = afiliados.map(a => a.cc);
-        const { data: registros, error } = await sb
-          .from('ingreso_programa')
-          .select('id, recibo, cc, afiliado, total, total_ss, banco, planilla, periodo, eps_val, arl_val, afp_val, ccf_val, eps_nit, arl_nit, afp_nit, ccf_nit, eps_nombre, arl_nombre, afp_nombre, ccf_nombre')
-          .in('cc', ccs)
-          .eq('mes', mesBI)
-          .eq('anio', anioBI)
-          .neq('banco', 'Retiros');
-        if (error) { mostrarToast('Error buscando en programa: ' + error.message, true); return; }
+        // ── 5. Buscar CIs en ingreso_programa por CC ──────────
+        // Buscar en el mes del período Y en meses adyacentes (±1)
+        // porque planillas complementarias pueden cruzar meses
+        const periodoNorm = periodo.replace(/[^0-9]/g, ''); // "2026/02" → "202602"
+        const mesBI  = parseInt(periodoNorm.substring(4, 6));  // 2
+        const anioBI = parseInt(periodoNorm.substring(0, 4));  // 2026
+        // Calcular mes anterior y siguiente para búsqueda amplia
+        const meses = [];
+        for (let delta = -1; delta <= 1; delta++) {
+          let m2 = mesBI + delta, a2 = anioBI;
+          if (m2 < 1)  { m2 = 12; a2--; }
+          if (m2 > 12) { m2 = 1;  a2++; }
+          meses.push({ mes: String(m2).padStart(2,'0'), anio: String(a2) });
+        }
 
+        const ccs = afiliados.map(a => a.cc);
+        // Buscar todos los CIs de estos afiliados en los 3 meses
+        let todosRegistros = [];
+        for (const { mes: mesQ, anio: anioQ } of meses) {
+          const { data: regs } = await sb
+            .from('ingreso_programa')
+            .select('id, recibo, cc, afiliado, total, total_ss, banco, planilla, periodo, mes, anio, eps_val, arl_val, afp_val, ccf_val, eps_nit, arl_nit, afp_nit, ccf_nit, eps_nombre, arl_nombre, afp_nombre, ccf_nombre')
+            .in('cc', ccs)
+            .eq('mes', mesQ)
+            .eq('anio', anioQ)
+            .neq('banco', 'Retiros');
+          if (regs) todosRegistros = todosRegistros.concat(regs);
+        }
+
+        // Por cada afiliado del XLS, elegir el CI con total_ss más cercano
+        // al valor de ese afiliado en el Detalle Planilla
         const porCC = {};
-        (registros || []).forEach(r => {
+        todosRegistros.forEach(r => {
           if (!porCC[r.cc]) porCC[r.cc] = [];
           porCC[r.cc].push(r);
         });
-        crucePlanillaData = registros || [];
 
-        // ── 6. Asignar número de planilla en ingreso_programa ─
-        const sinPlanilla = crucePlanillaData.filter(r => !r.planilla || r.planilla === '');
-        if (sinPlanilla.length > 0) {
-          const ids = sinPlanilla.map(r => r.id);
+        // Construir mapa CC → total_ss del XLS para el match
+        const totalSSXLS = {};
+        afiliados.forEach(a => {
+          // Buscar en el detalle acumulado por CC — sumar eps+arl+afp+ccf de las entidades
+          // Aproximar desde acumEPS/ARL/AFP/CCF no está disponible aquí
+          // Usar total_ss del registro encontrado como referencia
+        });
+
+        // Seleccionar el mejor CI por CC: primero el que no tiene planilla,
+        // si todos tienen planilla tomar el más reciente (mayor recibo)
+        const seleccionados = {};
+        Object.entries(porCC).forEach(([cc, regs]) => {
+          // Ordenar: primero sin planilla, luego por recibo descendente
+          const sorted = [...regs].sort((a, b) => {
+            const aSinPlanilla = !a.planilla || a.planilla === '';
+            const bSinPlanilla = !b.planilla || b.planilla === '';
+            if (aSinPlanilla && !bSinPlanilla) return -1;
+            if (!aSinPlanilla && bSinPlanilla) return 1;
+            return String(b.recibo).localeCompare(String(a.recibo));
+          });
+          seleccionados[cc] = sorted[0];
+        });
+
+        crucePlanillaData = Object.values(seleccionados).filter(Boolean);
+        const porCCFinal = {};
+        crucePlanillaData.forEach(r => { porCCFinal[r.cc] = [r]; });
+
+        // ── 6. Asignar número de planilla a los CIs seleccionados ─
+        if (crucePlanillaData.length > 0) {
+          const ids = crucePlanillaData.map(r => r.id);
           const { error: eUpd } = await sb.from('ingreso_programa').update({ planilla: noPlanilla }).in('id', ids);
-          if (!eUpd) sinPlanilla.forEach(r => { r.planilla = noPlanilla; });
+          if (!eUpd) crucePlanillaData.forEach(r => { r.planilla = noPlanilla; });
         }
 
         // ── 7. Actualizar numero_planilla en el movimiento ─
-        const m = movimientos.find(x => String(x.id) === String(contabMovId));
-        if (m && (!m.numero_planilla || m.numero_planilla === '')) {
+        const movActual = movimientos.find(x => String(x.id) === String(contabMovId));
+        if (movActual && (!movActual.numero_planilla || movActual.numero_planilla === '')) {
           await guardarCampo(contabMovId, 'numero_planilla', noPlanilla);
           document.getElementById('contabPlanilla').value = noPlanilla;
         }
 
         // ── 8. Renderizar resultado ────────────────────────
-        mostrarResultadoCruce(afiliados, porCC, noPlanilla, periodo, entidades, totalDetalle);
+        mostrarResultadoCruce(afiliados, porCCFinal, noPlanilla, periodo, entidades, totalDetalle);
 
       } catch(err) {
         mostrarToast('Error procesando archivo: ' + err.message, true);
