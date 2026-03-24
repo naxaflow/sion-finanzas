@@ -1550,48 +1550,60 @@
     mostrarToast('✅ Planilla procesada: ' + encontrados + '/' + afiliados.length + ' CIs encontrados');
   }
 
-  function usarCruceEnComprobante() {
+  async function usarCruceEnComprobante() {
     const m         = movimientos.find(x => String(x.id) === String(contabMovId));
     const abs       = Math.abs(Number(m ? m.monto : 0));
     const cuenta    = m ? m.cuenta : '';
     const pucBanco  = BANCO_PUC[cuenta] || '11200505';
     const descBanco = PUC[pucBanco] || cuenta;
 
-    contabLineasData = [];
+    // Consultar BD fresco por número de planilla — fuente de verdad
+    const { data: regs, error } = await sb
+      .from('ingreso_programa')
+      .select('id, recibo, cc, afiliado, total, total_ss, banco, planilla, eps_val, arl_val, afp_val, ccf_val, eps_nit, arl_nit, afp_nit, ccf_nit, eps_nombre, arl_nombre, afp_nombre, ccf_nombre')
+      .eq('planilla', cruceXLSNoPlanilla)
+      .neq('banco', 'Retiros');
 
-    // Línea crédito banco — sale el dinero
+    if (error) { mostrarToast('Error cargando CIs: ' + error.message, true); return; }
+    if (!regs || regs.length === 0) {
+      mostrarToast('⚠️ No se encontraron CIs con planilla ' + cruceXLSNoPlanilla, true); return;
+    }
+
+    // Deduplicar por CC — si hay dos CIs del mismo afiliado tomar el de mayor recibo
+    const porCC = {};
+    regs.forEach(r => {
+      if (!porCC[r.cc] || String(r.recibo) > String(porCC[r.cc].recibo)) {
+        porCC[r.cc] = r;
+      }
+    });
+    const registros = Object.values(porCC);
+
+    contabLineasData = [];
+    // Línea crédito banco
     contabLineasData.push({ puc: pucBanco, desc: descBanco, nit: '900452068', deb: 0, cred: abs });
 
-    // Una línea débito por cada afiliado × entidad
-    // Fuente: crucePlanillaData (registros de ingreso_programa del período)
-    // Ordenar por CC para agrupar visualmente por afiliado
-    const regs = [...crucePlanillaData].sort((a, b) => String(a.cc).localeCompare(String(b.cc)));
-
-    regs.forEach(r => {
-      const ci     = String(r.recibo).padStart(11, '0');
-      const afil   = r.afiliado || r.cc;
-
-      // EPS
+    // Una línea débito por afiliado × entidad
+    registros.sort((a,b) => String(a.cc).localeCompare(String(b.cc)));
+    registros.forEach(r => {
+      const ci   = String(r.recibo).padStart(11, '0');
+      const afil = r.afiliado || r.cc;
       if (Number(r.eps_val) > 0) {
-        const nit  = r.eps_nit  || nitEntidadPorNombre(r.eps_nombre);
+        const nit  = r.eps_nit || nitEntidadPorNombre(r.eps_nombre);
         const desc = nit ? nombreEntidad(nit, r.eps_nombre) : (r.eps_nombre || 'EPS por pagar');
         contabLineasData.push({ puc: '28150501', desc, nit, deb: Number(r.eps_val), cred: 0, _ci: ci, _afil: afil });
       }
-      // ARL
       if (Number(r.arl_val) > 0) {
-        const nit  = r.arl_nit  || nitEntidadPorNombre(r.arl_nombre);
+        const nit  = r.arl_nit || nitEntidadPorNombre(r.arl_nombre);
         const desc = nit ? nombreEntidad(nit, r.arl_nombre) : (r.arl_nombre || 'ARL por pagar');
         contabLineasData.push({ puc: '28150502', desc, nit, deb: Number(r.arl_val), cred: 0, _ci: ci, _afil: afil });
       }
-      // AFP
       if (Number(r.afp_val) > 0) {
-        const nit  = r.afp_nit  || nitEntidadPorNombre(r.afp_nombre);
+        const nit  = r.afp_nit || nitEntidadPorNombre(r.afp_nombre);
         const desc = nit ? nombreEntidad(nit, r.afp_nombre) : (r.afp_nombre || 'AFP por pagar');
         contabLineasData.push({ puc: '28150503', desc, nit, deb: Number(r.afp_val), cred: 0, _ci: ci, _afil: afil });
       }
-      // CCF
       if (Number(r.ccf_val) > 0) {
-        const nit  = r.ccf_nit  || nitEntidadPorNombre(r.ccf_nombre);
+        const nit  = r.ccf_nit || nitEntidadPorNombre(r.ccf_nombre);
         const desc = nit ? nombreEntidad(nit, r.ccf_nombre) : (r.ccf_nombre || 'CCF por pagar');
         contabLineasData.push({ puc: '28150504', desc, nit, deb: Number(r.ccf_val), cred: 0, _ci: ci, _afil: afil });
       }
@@ -1603,7 +1615,7 @@
 
     renderLineasContab();
     cerrarPlanillaEgreso();
-    mostrarToast('✓ Comprobante — planilla ' + cruceXLSNoPlanilla + ' — ' + regs.length + ' afiliados — ' + (contabLineasData.length - 1) + ' líneas');
+    mostrarToast('✓ Comprobante — planilla ' + cruceXLSNoPlanilla + ' — ' + registros.length + ' afiliados — ' + (contabLineasData.length - 1) + ' líneas');
   }
 
   // Extrae el número CI del texto del recibo (ej: "01. Mar No._CI-00000021627-..." → "00000021627")
@@ -1818,7 +1830,6 @@
       descripcion:     m ? m.descripcion : null,
       recibo:          m ? m.recibo : null,
       cc:              prog ? prog.cc : null,
-      afiliado:        prog ? prog.afiliado : null,
       numero_planilla: planilla || (m ? m.numero_planilla : null),
       tipo:            m && Number(m.monto) >= 0 ? 'ingreso' : 'egreso',
       estado:          'borrador',
