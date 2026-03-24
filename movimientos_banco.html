@@ -1397,15 +1397,19 @@
         const totalDetalle = entidades.reduce((s, e) => s + e.valor, 0);
         cruceXLSTotales = { entidades, total: totalDetalle };
 
-        // ── 5. Buscar CIs en ingreso_programa por CC + período ─
-        // Cabeza devuelve "2026/02" → BD guarda "202602" (sin separador)
-        const periodoNorm = periodo.replace(/[^0-9]/g, ''); // "2026/02" → "202602"
+        // ── 5. Buscar CIs en ingreso_programa por CC + mes/año ─
+        // Usar mes y anio (campos de carga) en lugar de periodo (campo de cotización)
+        // periodo XLS "2026/03" → mes="03", anio="2026"
+        const periodoNorm = periodo.replace(/[^0-9]/g, ''); // "2026/03" → "202603"
+        const mesBI  = periodoNorm.substring(4, 6);  // "03"
+        const anioBI = periodoNorm.substring(0, 4);  // "2026"
         const ccs = afiliados.map(a => a.cc);
         const { data: registros, error } = await sb
           .from('ingreso_programa')
           .select('id, recibo, cc, afiliado, total, total_ss, banco, planilla, periodo, eps_val, arl_val, afp_val, ccf_val, eps_nit, arl_nit, afp_nit, ccf_nit, eps_nombre, arl_nombre, afp_nombre, ccf_nombre')
           .in('cc', ccs)
-          .eq('periodo', periodoNorm)
+          .eq('mes', mesBI)
+          .eq('anio', anioBI)
           .neq('banco', 'Retiros');
         if (error) { mostrarToast('Error buscando en programa: ' + error.message, true); return; }
 
