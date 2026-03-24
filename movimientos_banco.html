@@ -1396,12 +1396,15 @@
         const totalDetalle = entidades.reduce((s, e) => s + e.valor, 0);
         cruceXLSTotales = { entidades, total: totalDetalle };
 
-        // ── 5. Buscar CIs en ingreso_programa por CC ───────
+        // ── 5. Buscar CIs en ingreso_programa por CC + período ─
+        // Cabeza devuelve "2026/02" → BD guarda "202602" (sin separador)
+        const periodoNorm = periodo.replace(/[^0-9]/g, ''); // "2026/02" → "202602"
         const ccs = afiliados.map(a => a.cc);
         const { data: registros, error } = await sb
           .from('ingreso_programa')
-          .select('id, recibo, cc, afiliado, total, total_ss, banco, planilla')
+          .select('id, recibo, cc, afiliado, total, total_ss, banco, planilla, periodo')
           .in('cc', ccs)
+          .eq('periodo', periodoNorm)
           .neq('banco', 'Retiros');
         if (error) { mostrarToast('Error buscando en programa: ' + error.message, true); return; }
 
