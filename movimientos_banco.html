@@ -1201,6 +1201,8 @@
     '800227940': 'COLFONDOS',
     '891180008': 'COMFAMILIAR DEL HUILA',
   };
+
+  function nombreEntidad(nit, nombreXLS) {
     const n = String(nit || '').trim().replace(/\D/g, '');
     if (n && ENTIDADES_PAGO[n]) return n + ' — ' + ENTIDADES_PAGO[n].nombre;
     return (nombreXLS || '').replace(/\s+/g, ' ').trim();
