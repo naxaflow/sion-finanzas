@@ -390,6 +390,7 @@
       <span style="font-size:0.8rem;color:var(--muted);" id="contabEstado"></span>
       <div style="display:flex;gap:10px;">
         <button onclick="cerrarContabilizar()" style="padding:8px 18px;border-radius:7px;border:1px solid var(--border);background:white;cursor:pointer;font-size:0.85rem;">Cancelar</button>
+        <button onclick="exportarCSVComprobante()" style="padding:8px 18px;border-radius:7px;border:none;background:#166534;color:white;cursor:pointer;font-size:0.85rem;font-weight:600;">⬇ CSV</button>
         <button onclick="guardarComprobante()" style="padding:8px 18px;border-radius:7px;border:none;background:var(--accent);color:white;cursor:pointer;font-size:0.85rem;font-weight:600;">💾 Guardar comprobante</button>
       </div>
     </div>
@@ -732,7 +733,7 @@
       .filter(r => r && !cachePrograma[r]);
     if (faltantes.length === 0) return;
     const { data } = await sb.from('ingreso_programa')
-      .select('recibo, afiliado, cc, banco, total, total_ss, eps_val, arl_val, afp_val, ccf_val, fsp, admon, detalle, planilla')
+      .select('recibo, afiliado, cc, banco, total, total_ss, eps_val, arl_val, afp_val, ccf_val, fsp, admon, detalle, planilla, eps_nit, arl_nit, afp_nit, ccf_nit, eps_nombre, arl_nombre, afp_nombre, ccf_nombre, periodo')
       .in('recibo', faltantes);
     if (data) data.forEach(r => { 
       cachePrograma[r.recibo] = r;
@@ -747,7 +748,7 @@
     const ci = extraerCI(recibo);
     if (!buscarEnCache(recibo)) {
       const { data } = await sb.from('ingreso_programa')
-        .select('recibo, afiliado, cc, banco, total, total_ss, eps_val, arl_val, afp_val, ccf_val, fsp, admon, detalle, planilla')
+        .select('recibo, afiliado, cc, banco, total, total_ss, eps_val, arl_val, afp_val, ccf_val, fsp, admon, detalle, planilla, eps_nit, arl_nit, afp_nit, ccf_nit, eps_nombre, arl_nombre, afp_nombre, ccf_nombre, periodo')
         .eq('recibo', ci).single();
       if (data) {
         cachePrograma[data.recibo] = data;
@@ -1159,6 +1160,91 @@
     return (nombreXLS || '').replace(/\s+/g, ' ').trim();
   }
 
+  // Buscar NIT en catálogo por coincidencia de nombre (fallback cuando no viene en BD)
+  function nitEntidadPorNombre(nombre) {
+    if (!nombre) return '';
+    const nom = nombre.toLowerCase().trim();
+    for (const [nit, ent] of Object.entries(ENTIDADES_PAGO)) {
+      if (nom.includes(ent.nombre.toLowerCase().substring(0, 7)) ||
+          ent.nombre.toLowerCase().includes(nom.substring(0, 7))) return nit;
+    }
+    return '';
+  }
+
+  // ── Exportar CSV comprobante (formato contabilidad) ───────
+  // Formato: tipo;fecha;30;CI-XXXXXXXX;PUC;;descripcion;debito;credito;;NIT;NIT
+  // tipo: 6=Banco SION/Daviplata, 7=Independientes
+  // Para egreso planilla: una sección por cada entidad sumada
+  function exportarCSVComprobante() {
+    const m    = movimientos.find(x => String(x.id) === String(contabMovId));
+    const prog = m && m.recibo ? buscarEnCache(m.recibo) : null;
+    if (!m) { mostrarToast('⚠️ No hay movimiento activo', true); return; }
+
+    const cuenta    = m.cuenta || '';
+    const esIndep   = cuenta === 'Independientes';
+    const tipo      = esIndep ? '7' : '6';
+    const fechaCSV  = m.fecha_orden
+      ? (() => { const p = m.fecha_orden.split('-'); return p[2]+'/'+p[1]+'/'+p[0]; })()
+      : '';
+    const recibo    = prog ? 'CI-' + String(prog.recibo).padStart(11,'0') : (m.recibo || '');
+    const cc        = prog ? (prog.cc || '') : document.getElementById('contabCC').textContent.replace('—','').trim();
+
+    // Descripción: "SERVICIO MES DE [MES] DE [AÑO]" desde detalle/periodo
+    const MESES_NOMBRE = ['','ENERO','FEBRERO','MARZO','ABRIL','MAYO','JUNIO',
+                          'JULIO','AGOSTO','SEPTIEMBRE','OCTUBRE','NOVIEMBRE','DICIEMBRE'];
+    let descBase = '';
+    if (prog && prog.detalle) {
+      descBase = String(prog.detalle).toUpperCase().trim();
+    } else if (prog && prog.periodo) {
+      // periodo puede ser "2026/02" o "2026-02"
+      const parts = String(prog.periodo).replace('-','/').split('/');
+      if (parts.length === 2) {
+        const anio = parts[0].length === 4 ? parts[0] : parts[1];
+        const mes  = parts[0].length === 4 ? parseInt(parts[1]) : parseInt(parts[0]);
+        descBase = 'SERVICIO MES DE ' + (MESES_NOMBRE[mes] || mes) + ' DE ' + anio;
+      }
+    } else {
+      const fo = m.fecha_orden || '';
+      if (fo) {
+        const anio = fo.substring(0,4);
+        const mes  = parseInt(fo.substring(5,7));
+        descBase = 'SERVICIO MES DE ' + (MESES_NOMBRE[mes] || mes) + ' DE ' + anio;
+      }
+    }
+
+    const lineas = contabLineasData;
+    if (lineas.length === 0) { mostrarToast('⚠️ No hay líneas en el comprobante', true); return; }
+
+    // Construir filas CSV
+    const rows = [];
+    lineas.forEach(l => {
+      const puc    = l.puc   || '';
+      const deb    = l.deb   > 0 ? String(Math.round(l.deb))  : '0';
+      const cred   = l.cred  > 0 ? String(Math.round(l.cred)) : '0';
+      // NIT de la línea: para la línea banco = CC del afiliado, para entidades = nit de la entidad
+      const nitLinea = l.nit || (puc === BANCO_PUC[cuenta] ? cc : '');
+      // Descripción de la línea
+      let descLinea = descBase;
+      if (puc === '28150501') descLinea = descBase + ' EPS';
+      else if (puc === '28150502') descLinea = descBase + ' ARP';
+      else if (puc === '28150503') descLinea = descBase + ' AFP';
+      else if (puc === '28150504') descLinea = descBase + ' CCF';
+      else if (puc === '28150510') descLinea = descBase + ' FSP';
+      else if (puc === '41701001') descLinea = descBase + ' ADMON';
+      rows.push([tipo, fechaCSV, '30', recibo, puc, '', descLinea, deb, cred, '', nitLinea, nitLinea].join(';'));
+    });
+
+    const csv     = rows.join('\r\n');
+    const blob    = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url     = URL.createObjectURL(blob);
+    const a       = document.createElement('a');
+    a.href        = url;
+    a.download    = recibo.replace(/[^a-z0-9_-]/gi,'_') + '_' + (fechaCSV.replace(/\//g,'-')) + '.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+    mostrarToast('✅ CSV exportado');
+  }
+
   // ── Planilla Egreso (cruce UGPP desde archivo XLS) ────────
   let crucePlanillaData  = [];
   let cruceXLSTotales    = {};  // { entidades: [{puc,nit,nombre,valor}], total }
@@ -1426,11 +1512,11 @@
     const entidades = cruceXLSTotales.entidades || [];
 
     contabLineasData = [];
-    // Primera línea: crédito banco (sale el dinero)
-    contabLineasData.push({ puc: pucBanco, desc: descBanco, deb: 0, cred: abs });
+    // Primera línea: crédito banco (sale el dinero) — NIT = SION UCE
+    contabLineasData.push({ puc: pucBanco, desc: descBanco, nit: '900452068', deb: 0, cred: abs });
     // Una línea débito por cada entidad
     entidades.forEach(e => {
-      contabLineasData.push({ puc: e.puc, desc: e.nombre, deb: e.valor, cred: 0 });
+      contabLineasData.push({ puc: e.puc, desc: e.nombre, nit: e.nit || '', deb: e.valor, cred: 0 });
     });
 
     if (cruceXLSNoPlanilla) {
@@ -1520,29 +1606,31 @@
     const esAdmision  = detalle.includes('ADMISI');
     const esReintegro = detalle.includes('REINTEGRO') || detalle.includes('REINGRESO');
 
+    const nitSION  = '900452068';
+    const nitAfil  = prog ? (prog.cc || '') : '';
+
     if (m.concepto === 'Seguridad Social' && monto > 0) {
 
-      // Débito: banco
-      lineas.push({ puc: pucBanco, desc: descBanco, deb: abs, cred: 0 });
+      // Débito: banco — NIT = CC del afiliado
+      lineas.push({ puc: pucBanco, desc: descBanco, nit: nitAfil, deb: abs, cred: 0 });
 
       if (esAdmision) {
-        // ADMISIÓN
-        lineas.push({ puc: '28150505', desc: 'ADMISIÓN',       deb: 0, cred: abs - 67650 });
-        lineas.push({ puc: '41701001', desc: 'SOSTENIBILIDAD', deb: 0, cred: 67650 });
+        lineas.push({ puc: '28150505', desc: 'ADMISIÓN',       nit: nitSION, deb: 0, cred: abs - 67650 });
+        lineas.push({ puc: '41701001', desc: 'SOSTENIBILIDAD', nit: nitSION, deb: 0, cred: 67650 });
 
       } else if (esReintegro) {
-        // REINTEGRO
-        lineas.push({ puc: '28150505', desc: 'REINTEGRO',      deb: 0, cred: 67650 });
-        lineas.push({ puc: '41701001', desc: 'SOSTENIBILIDAD', deb: 0, cred: abs - 67650 });
+        lineas.push({ puc: '28150505', desc: 'REINTEGRO',      nit: nitSION, deb: 0, cred: 67650 });
+        lineas.push({ puc: '41701001', desc: 'SOSTENIBILIDAD', nit: nitSION, deb: 0, cred: abs - 67650 });
 
       } else if (prog) {
-        // PERMANENCIA — cuentas detalladas desde ingreso programa
-        if (Number(prog.eps_val) > 0) lineas.push({ puc: '28150501', desc: prog.eps_nombre || 'EPS por pagar',  deb: 0, cred: Number(prog.eps_val) });
-        if (Number(prog.arl_val) > 0) lineas.push({ puc: '28150502', desc: prog.arl_nombre || 'ARL por pagar',  deb: 0, cred: Number(prog.arl_val) });
-        if (Number(prog.afp_val) > 0) lineas.push({ puc: '28150503', desc: prog.afp_nombre || 'AFP por pagar',  deb: 0, cred: Number(prog.afp_val) });
-        if (Number(prog.ccf_val) > 0) lineas.push({ puc: '28150504', desc: prog.ccf_nombre || 'CCF por pagar',  deb: 0, cred: Number(prog.ccf_val) });
-        if (Number(prog.fsp)     > 0) lineas.push({ puc: '28150510', desc: 'FSP por pagar',                     deb: 0, cred: Number(prog.fsp) });
-        if (Number(prog.admon)   > 0) lineas.push({ puc: '41701001', desc: 'SOSTENIBILIDAD',                    deb: 0, cred: Number(prog.admon) });
+        // PERMANENCIA — cuentas detalladas desde ingreso programa con NITs
+        const nitSION = '900452068';
+        if (Number(prog.eps_val) > 0) lineas.push({ puc: '28150501', desc: prog.eps_nombre || 'EPS por pagar', nit: prog.eps_nit || nitEntidadPorNombre(prog.eps_nombre), deb: 0, cred: Number(prog.eps_val) });
+        if (Number(prog.arl_val) > 0) lineas.push({ puc: '28150502', desc: prog.arl_nombre || 'ARL por pagar', nit: prog.arl_nit || nitEntidadPorNombre(prog.arl_nombre), deb: 0, cred: Number(prog.arl_val) });
+        if (Number(prog.afp_val) > 0) lineas.push({ puc: '28150503', desc: prog.afp_nombre || 'AFP por pagar', nit: prog.afp_nit || nitEntidadPorNombre(prog.afp_nombre), deb: 0, cred: Number(prog.afp_val) });
+        if (Number(prog.ccf_val) > 0) lineas.push({ puc: '28150504', desc: prog.ccf_nombre || 'CCF por pagar', nit: prog.ccf_nit || nitEntidadPorNombre(prog.ccf_nombre), deb: 0, cred: Number(prog.ccf_val) });
+        if (Number(prog.fsp)     > 0) lineas.push({ puc: '28150510', desc: 'FSP por pagar',                    nit: '',          deb: 0, cred: Number(prog.fsp) });
+        if (Number(prog.admon)   > 0) lineas.push({ puc: '41701001', desc: 'SOSTENIBILIDAD',                   nit: nitSION,     deb: 0, cred: Number(prog.admon) });
       } else {
         // Sin datos de programa — línea manual
         lineas.push({ puc: '', desc: 'SS por pagar', deb: 0, cred: abs });
